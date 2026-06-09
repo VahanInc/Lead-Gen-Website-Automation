@@ -70,10 +70,20 @@ pipeline {
                         script: "grep -oP 'tests=\"\\K[0-9]+' test-results/junit.xml 2>/dev/null | head -1 || echo '?'",
                         returnStdout: true
                     ).trim()
+                    def failedNames = sh(
+                        script: """python3 -c \"
+import xml.etree.ElementTree as ET
+tree = ET.parse('test-results/junit.xml')
+names = ['• ' + tc.get('name','') for tc in tree.iter('testcase') if tc.find('failure') is not None]
+print('\\\\n'.join(names[:10]))
+\" 2>/dev/null || echo '_Could not parse test names_'""",
+                        returnStdout: true
+                    ).trim()
 
                     def payload = groovy.json.JsonOutput.toJson([
                         text: ":red_circle: *Lead Gen Tests FAILED* — Build #${env.BUILD_NUMBER} (${branch})\n" +
                               "*Failed:* ${failed} / ${total}  |  *Duration:* ${duration}\n\n" +
+                              "*Failed tests:*\n${failedNames}\n\n" +
                               "<${reportUrl}|:bar_chart: View Playwright Report>"
                     ])
 

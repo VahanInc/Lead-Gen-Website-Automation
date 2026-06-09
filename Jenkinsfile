@@ -35,7 +35,7 @@ pipeline {
                         -v ${WORKSPACE}/playwright-report:/app/playwright-report \
                         -v ${WORKSPACE}/test-results:/app/test-results \
                         ${IMAGE_NAME} \
-                        npx playwright test --workers=2
+                        npx playwright test --workers=4
                 """
             }
         }

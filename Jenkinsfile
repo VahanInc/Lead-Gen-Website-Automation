@@ -35,7 +35,7 @@ pipeline {
                         -v ${WORKSPACE}/playwright-report:/app/playwright-report \
                         -v ${WORKSPACE}/test-results:/app/test-results \
                         ${IMAGE_NAME} \
-                        npx playwright test --workers=4
+                        sh -c 'npx playwright test --workers=4; PW_EXIT=\$?; node scripts/generate-report.js 2>/dev/null || true; exit \$PW_EXIT'
                 """
             }
         }
@@ -44,7 +44,6 @@ pipeline {
     post {
         always {
             junit allowEmptyResults: true, testResults: 'test-results/junit.xml'
-            sh "node scripts/generate-report.js || true"
             archiveArtifacts artifacts: 'playwright-report/**', allowEmptyArchive: true
             sh "docker rmi ${IMAGE_NAME} || true"
         }

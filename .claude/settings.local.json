@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "WebFetch(domain:vahan.co)",
+      "Bash(npx tsc *)",
+      "Bash(npx playwright *)",
+      "Bash(cp /tmp/debug_filter.spec.ts /Users/akhil/vahan_leader_automation/leadGenWebsite/tests/debugFilter.spec.ts *)",
+      "Bash(awk -F\"'\" '{print $2}')"
+    ],
+    "additionalDirectories": [
+      "/private/tmp"
+    ]
+  }
+}

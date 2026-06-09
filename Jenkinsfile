@@ -44,14 +44,7 @@ pipeline {
     post {
         always {
             junit allowEmptyResults: true, testResults: 'test-results/junit.xml'
-            publishHTML(target: [
-                allowMissing         : true,
-                alwaysLinkToLastBuild: true,
-                keepAll              : true,
-                reportDir            : 'playwright-report',
-                reportFiles          : 'index.html',
-                reportName           : 'Playwright Report'
-            ])
+            archiveArtifacts artifacts: 'playwright-report/**', allowEmptyArchive: true
             sh "docker rmi ${IMAGE_NAME} || true"
         }
 
@@ -60,7 +53,7 @@ pipeline {
                 try {
                     def duration  = currentBuild.durationString.replace(' and counting', '')
                     def branch    = env.GIT_BRANCH ?: 'main'
-                    def reportUrl = "${env.BUILD_URL}Playwright_20Report"
+                    def reportUrl = "${env.BUILD_URL}artifact/playwright-report/index.html"
 
                     def failed = sh(
                         script: "grep -oP 'failures=\"\\K[0-9]+' test-results/junit.xml 2>/dev/null | head -1 || echo '?'",
@@ -98,7 +91,7 @@ print('\\\\n'.join(names[:10]))
             script {
                 try {
                     def duration  = currentBuild.durationString.replace(' and counting', '')
-                    def reportUrl = "${env.BUILD_URL}Playwright_20Report"
+                    def reportUrl = "${env.BUILD_URL}artifact/playwright-report/index.html"
 
                     def total = sh(
                         script: "grep -oP 'tests=\"\\K[0-9]+' test-results/junit.xml 2>/dev/null | head -1 || echo '?'",

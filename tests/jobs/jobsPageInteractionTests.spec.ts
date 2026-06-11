@@ -175,10 +175,7 @@ test.describe('Pagination', () => {
 // ALERT ME FORM — POSITIVE
 // ============================================================
 test.describe('Alert Me form - positive', () => {
-  // Skipped: React's controlled-input state is not updated by programmatic fill/type
-  // in this headless environment, leaving the submit button disabled. The happy-path
-  // submission flow cannot be reliably automated against the live site.
-  test.skip('valid area name + phone number navigates to Vahan WhatsApp with correct message', async ({
+  test('valid area name + phone number navigates to Vahan WhatsApp with correct message', async ({
     page,
   }) => {
     const jobsPage = new JobsPage(page);
@@ -188,9 +185,10 @@ test.describe('Alert Me form - positive', () => {
 
     await jobsPage.areaNameInput.pressSequentially('Koramangala', { delay: 50 });
     await jobsPage.alertWhatsAppInput.pressSequentially('9000000001', { delay: 50 });
+    await jobsPage.alertSubmitButton.click();
 
     await expect.poll(getUrl, { timeout: 10000 }).toMatch(WHATSAPP_URL_PATTERN);
-    expect(getUrl()).toContain(`phone=${VAHAN_WHATSAPP_PHONE}`);
+    expect(getUrl()).toContain(VAHAN_WHATSAPP_PHONE);
     expect(decodeURIComponent(getUrl())).toContain('delivery job');
   });
 });

@@ -53,7 +53,7 @@ pipeline {
                 try {
                     def duration  = currentBuild.durationString.replace(' and counting', '')
                     def branch    = env.GIT_BRANCH ?: 'main'
-                    def reportUrl = "${env.BUILD_URL}artifact/playwright-report/dashboard.html"
+                    def reportUrl = "${env.BUILD_URL}artifact/playwright-report/dashboard.png"
 
                     def failed = sh(
                         script: "grep -oP 'failures=\"\\K[0-9]+' test-results/junit.xml 2>/dev/null | head -1 || echo '?'",
@@ -91,7 +91,7 @@ print('\\\\n'.join(names[:10]))
             script {
                 try {
                     def duration  = currentBuild.durationString.replace(' and counting', '')
-                    def reportUrl = "${env.BUILD_URL}artifact/playwright-report/dashboard.html"
+                    def reportUrl = "${env.BUILD_URL}artifact/playwright-report/dashboard.png"
 
                     def total = sh(
                         script: "grep -oP 'tests=\"\\K[0-9]+' test-results/junit.xml 2>/dev/null | head -1 || echo '?'",

@@ -13,6 +13,10 @@ pipeline {
         disableConcurrentBuilds()
     }
 
+    triggers {
+        cron('H 10 * * *')   // Playwright runs daily 10:00–10:59
+    }
+
     stages {
         stage('Checkout') {
             steps {
@@ -43,6 +47,13 @@ pipeline {
         }
 
         stage('Lighthouse') {
+            when {
+                expression {
+                    // Cron builds: run only on Mondays. Manual builds: always run.
+                    def isTimer = !currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').isEmpty()
+                    return !isTimer || new Date().format('u').toInteger() == 1
+                }
+            }
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     sh """
@@ -89,10 +100,16 @@ pipeline {
                     def pwTotalInt  = pwTotal.isInteger()  ? pwTotal.toInteger()  : 0
 
                     // ── Lighthouse result ──────────────────────────────────────
-                    def lhRaw    = sh(script: "cat lighthouse-report/lhci-issues.txt 2>/dev/null || echo 'UNKNOWN'", returnStdout: true).trim()
+                    // 'SKIPPED' when the stage was skipped (non-Monday cron build)
+                    def lhRaw    = sh(script: "cat lighthouse-report/lhci-issues.txt 2>/dev/null || echo 'SKIPPED'", returnStdout: true).trim()
                     def lhLines  = lhRaw.split('\n') as List
                     def lhStatus = lhLines[0].trim()
                     def lhIssues = lhLines.size() > 1 ? lhLines[1..-1].join('\n') : ''
+                    def lhFailed  = lhStatus == 'FAIL'
+                    def lhSkipped = lhStatus == 'SKIPPED'
+                    def lhFooter  = lhSkipped
+                        ? "_Lighthouse not scheduled today — runs every Monday_"
+                        : "<${lhUrl}|Lighthouse Report>"
 
                     // ── Failed test names (only fetched when needed) ───────────
                     def failedNames = ''
@@ -111,24 +128,24 @@ print('\\\\n'.join(names[:10]))
                     // ── Compose message based on which component(s) failed ─────
                     def text
 
-                    if (pwFailedInt == 0 && lhStatus != 'FAIL') {
-                        // Everything green
+                    if (pwFailedInt == 0 && !lhFailed) {
+                        // Playwright green; Lighthouse either passed or skipped
                         text = ":white_check_mark: *Lead Gen Tests PASSED* — ${pwTotalInt} tests in ${duration}\n" +
-                               "<${pwUrl}|Playwright Report>  |  <${lhUrl}|Lighthouse Report>"
+                               "<${pwUrl}|Playwright Report>  |  ${lhFooter}"
 
-                    } else if (pwFailedInt == 0 && lhStatus == 'FAIL') {
+                    } else if (pwFailedInt == 0 && lhFailed) {
                         // Tests pass but Lighthouse thresholds violated
                         text = ":warning: *Playwright PASSED — Lighthouse Thresholds FAILED* — Build #${env.BUILD_NUMBER} (${branch})\n" +
                                "*${pwTotalInt} / ${pwTotalInt} tests passed*  |  *Duration:* ${duration}\n\n" +
                                "*Lighthouse Issues:*\n${lhIssues}\n\n" +
-                               "<${pwUrl}|Playwright Report>  |  <${lhUrl}|Lighthouse Report>"
+                               "<${pwUrl}|Playwright Report>  |  ${lhFooter}"
 
-                    } else if (pwFailedInt > 0 && lhStatus != 'FAIL') {
-                        // Playwright failed, Lighthouse OK
+                    } else if (pwFailedInt > 0 && !lhFailed) {
+                        // Playwright failed; Lighthouse passed or skipped
                         text = ":red_circle: *Lead Gen Tests FAILED* — Build #${env.BUILD_NUMBER} (${branch})\n" +
                                "*Failed:* ${pwFailedInt} / ${pwTotalInt}  |  *Duration:* ${duration}\n\n" +
                                "*Failed tests:*\n${failedNames}\n\n" +
-                               "<${pwUrl}|Playwright Report>  |  <${lhUrl}|Lighthouse Report>"
+                               "<${pwUrl}|Playwright Report>  |  ${lhFooter}"
 
                     } else {
                         // Both Playwright and Lighthouse failed

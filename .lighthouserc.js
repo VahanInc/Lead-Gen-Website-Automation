@@ -6,6 +6,7 @@ module.exports = {
       url: [
         `${BASE_URL}/jobs/`,
         `${BASE_URL}/rider-adda/`,
+        `${BASE_URL}/blogs/`,
       ],
       numberOfRuns: 3,
       settings: {

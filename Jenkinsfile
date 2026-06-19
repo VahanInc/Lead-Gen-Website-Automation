@@ -48,7 +48,7 @@ pipeline {
                         -e BASE_URL=${BASE_URL} \
                         -v ${WORKSPACE}/lighthouse-report:/app/lighthouse-report \
                         ${IMAGE_NAME} \
-                        sh -c 'CHROME_PATH=\$(find /root/.cache/ms-playwright -name chrome -type f 2>/dev/null | head -1) npx lhci autorun'
+                        sh -c 'CHROME_PATH=\$(find /root/.cache/ms-playwright -name chrome -type f 2>/dev/null | head -1) npx lhci autorun; LHCI_EXIT=\$?; node scripts/generate-lighthouse-report.js 2>/dev/null || true; exit \$LHCI_EXIT'
                 """
             }
             post {
@@ -72,7 +72,7 @@ pipeline {
                     def duration      = currentBuild.durationString.replace(' and counting', '')
                     def branch        = env.GIT_BRANCH ?: 'main'
                     def reportUrl     = "${env.BUILD_URL}artifact/playwright-report/dashboard.png"
-                    def lhciReportUrl = "${env.BUILD_URL}artifact/lighthouse-report/"
+                    def lhciReportUrl = "${env.BUILD_URL}artifact/lighthouse-report/summary.png"
 
                     def failed = sh(
                         script: "grep -oP 'failures=\"\\K[0-9]+' test-results/junit.xml 2>/dev/null | head -1 || echo '?'",
@@ -111,7 +111,7 @@ print('\\\\n'.join(names[:10]))
                 try {
                     def duration      = currentBuild.durationString.replace(' and counting', '')
                     def reportUrl     = "${env.BUILD_URL}artifact/playwright-report/dashboard.png"
-                    def lhciReportUrl = "${env.BUILD_URL}artifact/lighthouse-report/"
+                    def lhciReportUrl = "${env.BUILD_URL}artifact/lighthouse-report/summary.png"
 
                     def total = sh(
                         script: "grep -oP 'tests=\"\\K[0-9]+' test-results/junit.xml 2>/dev/null | head -1 || echo '?'",

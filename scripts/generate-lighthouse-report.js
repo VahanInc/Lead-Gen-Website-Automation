@@ -4,10 +4,18 @@
 const fs   = require('fs');
 const path = require('path');
 
-const REPORT_DIR  = path.resolve(__dirname, '..', 'lighthouse-report');
-const MANIFEST    = path.join(REPORT_DIR, 'manifest.json');
-const HTML_PATH   = path.join(REPORT_DIR, 'summary.html');
-const PNG_PATH    = path.join(REPORT_DIR, 'summary.png');
+const REPORT_DIR   = path.resolve(__dirname, '..', 'lighthouse-report');
+const MANIFEST     = path.join(REPORT_DIR, 'manifest.json');
+const HTML_PATH    = path.join(REPORT_DIR, 'summary.html');
+const PNG_PATH     = path.join(REPORT_DIR, 'summary.png');
+const ISSUES_PATH  = path.join(REPORT_DIR, 'lhci-issues.txt');
+
+// Must match .lighthouserc.js error assertions
+const ERROR_THRESHOLDS = {
+  performance:   { min: 0.9, label: 'Performance',  display: 90  },
+  accessibility: { min: 0.9, label: 'Accessibility', display: 90  },
+  seo:           { min: 1.0, label: 'SEO',           display: 100 },
+};
 
 // ── score helpers ─────────────────────────────────────────────────────────────
 
@@ -55,6 +63,23 @@ try {
 }
 
 const runs = manifest.filter(r => r.isRepresentativeRun);
+
+// ── compute issues & write lhci-issues.txt ────────────────────────────────────
+
+const issueLines = [];
+for (const run of runs) {
+  const short = run.url.replace(/^https?:\/\/[^/]+/, '') || '/';
+  for (const [key, t] of Object.entries(ERROR_THRESHOLDS)) {
+    const raw = run.summary[key] ?? 0;
+    if (raw < t.min) {
+      issueLines.push(`• ${short}: ${t.label} ${Math.round(raw * 100)} (threshold ≥ ${t.display})`);
+    }
+  }
+}
+
+const lhOverall = runs.length === 0 ? 'UNKNOWN' : issueLines.length === 0 ? 'PASS' : 'FAIL';
+fs.writeFileSync(ISSUES_PATH, [lhOverall, ...issueLines].join('\n'), 'utf8');
+console.log(`Lighthouse overall → ${lhOverall}${issueLines.length ? ` (${issueLines.length} issue(s))` : ''}`);
 
 const CATS = [
   { key: 'performance',    label: 'Performance'    },
@@ -131,9 +156,10 @@ const body = `
     </div>
     <div style="border-top:1px solid #f0f0f0;padding-top:12px;font-size:11px;color:#94a3b8;line-height:1.6">
       <strong style="color:#475569">CI Thresholds:</strong>
-      &nbsp; Accessibility &ge; 90 <span style="color:#ef4444;font-weight:600">(fails build)</span>
-      &nbsp;&middot;&nbsp; Performance &ge; 70, Best Practices &ge; 80, SEO &ge; 80
-      <span style="color:#f59e0b;font-weight:600">(warnings only)</span>
+      &nbsp; Performance &ge; 90, Accessibility &ge; 90, SEO = 100
+      <span style="color:#ef4444;font-weight:600">(fail build)</span>
+      &nbsp;&middot;&nbsp; Best Practices &ge; 80
+      <span style="color:#f59e0b;font-weight:600">(warning only)</span>
     </div>
   </div>
 

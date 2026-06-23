@@ -14,7 +14,7 @@ pipeline {
     }
 
     triggers {
-        cron('H 10 * * *')   // Playwright runs daily 10:00–10:59
+        cron('H 5 * * *')   // Playwright runs daily 10:00–10:59
     }
 
     stages {

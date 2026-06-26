@@ -4,7 +4,8 @@
 const fs   = require('fs');
 const path = require('path');
 
-const REPORT_DIR   = path.resolve(__dirname, '..', 'lighthouse-report');
+const REPORT_DIR   = process.env.REPORT_DIR || path.resolve(__dirname, '..', 'lighthouse-report');
+const REPORT_LABEL = process.env.REPORT_LABEL || 'Lighthouse CI';
 const MANIFEST     = path.join(REPORT_DIR, 'manifest.json');
 const HTML_PATH    = path.join(REPORT_DIR, 'summary.html');
 const PNG_PATH     = path.join(REPORT_DIR, 'summary.png');
@@ -119,7 +120,7 @@ const body = `
   <!-- header -->
   <div style="background:#0f172a;color:#fff;border-radius:10px;padding:18px 24px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <div>
-      <div style="font-size:18px;font-weight:700">🔦 Lighthouse CI Report</div>
+      <div style="font-size:18px;font-weight:700">🔦 ${REPORT_LABEL} Report</div>
       <div style="font-size:12px;color:#94a3b8;margin-top:3px">${runs.length} page${runs.length !== 1 ? 's' : ''} audited &nbsp;·&nbsp; 3 runs averaged per page</div>
     </div>
     <div style="font-size:12px;color:#94a3b8">${now} IST</div>

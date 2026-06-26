@@ -49,9 +49,10 @@ pipeline {
         stage('Lighthouse') {
             when {
                 expression {
-                    // Cron builds: run only on Mondays. Manual builds: always run.
-                    def isTimer = !currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').isEmpty()
-                    return !isTimer || new Date().format('u').toInteger() == 1
+                    // Cron builds: run only on Mondays (IST). Manual builds: always run.
+                    def isTimer = currentBuild.getBuildCauses().toString().contains('TimerTrigger')
+                    def cal = Calendar.getInstance(TimeZone.getTimeZone('Asia/Kolkata'))
+                    return !isTimer || cal.get(Calendar.DAY_OF_WEEK) == Calendar.MONDAY
                 }
             }
             steps {

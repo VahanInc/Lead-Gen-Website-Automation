@@ -183,7 +183,7 @@ async function main() {
   console.log(`Lighthouse HTML  → ${HTML_PATH}`);
 
   const { chromium } = require('@playwright/test');
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
   try {
     const page = await browser.newPage();
     await page.setViewportSize({ width: 900, height: 600 });

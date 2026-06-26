@@ -1,0 +1,694 @@
+<title>Automation Coverage Report — Vahan Lead Gen</title>
+<style>
+:root {
+  --ground: #FAFAF8;
+  --ground-alt: #F2F1ED;
+  --text: #1C2333;
+  --muted: #5D6A7E;
+  --accent: #C97A08;
+  --blue: #2558C8;
+  --green: #146F48;
+  --red: #B82A1C;
+  --border: #E0DDD6;
+  --hero-bg: #0D1320;
+  --hero-amber: #F0A018;
+  --hero-green: #38B872;
+  --hero-dim: #38465A;
+  --mono: ui-monospace,'Cascadia Mono','SF Mono',Menlo,monospace;
+  --sans: system-ui,-apple-system,'Segoe UI',sans-serif;
+  --r: 5px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--ground);color:var(--text);font-size:14px;line-height:1.65}
+
+/* PRINT */
+@media print{
+  .no-print{display:none!important}
+  .hero{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{background:#fff}
+  .card,.stat-card,.lh-card,.info-card,.page-card,.pipeline-wrap,.chart-wrap{border:1px solid #ccc!important;box-shadow:none!important}
+  .suite-block{page-break-inside:avoid}
+  @page{margin:1.8cm;size:A4}
+}
+@media(prefers-reduced-motion:reduce){
+  .tl{animation:none!important;opacity:1!important}
+  .tsep{animation:none!important;opacity:1!important}
+  .cursor{animation:none!important;opacity:1!important}
+}
+
+/* HERO */
+.hero{background:var(--hero-bg);padding:52px 40px 44px;font-family:var(--mono);color:var(--hero-amber);position:relative;overflow:hidden}
+.hero::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0px,transparent 3px,rgba(255,255,255,.013) 3px,rgba(255,255,255,.013) 4px);pointer-events:none}
+.hero-inner{max-width:860px;margin:0 auto;position:relative;z-index:1}
+.hero-prompt{font-size:11px;color:var(--hero-dim);margin-bottom:22px;letter-spacing:.04em}
+.hero-prompt span{color:var(--hero-green)}
+
+.tsep{font-size:12px;color:var(--hero-dim);margin:8px 0;opacity:0}
+.tsep.s0{animation:tin .15s ease .1s forwards}
+.tsep.s1{animation:tin .15s ease 2.5s forwards}
+
+.tl{font-size:13px;line-height:1.9;display:flex;align-items:baseline;gap:9px;opacity:0}
+.tl.d1{animation:tin .2s ease .4s forwards}
+.tl.d2{animation:tin .2s ease .7s forwards}
+.tl.d3{animation:tin .2s ease .95s forwards}
+.tl.d4{animation:tin .2s ease 1.15s forwards}
+.tl.d5{animation:tin .2s ease 1.35s forwards}
+.tl.d6{animation:tin .2s ease 1.55s forwards}
+.tl.d7{animation:tin .2s ease 1.75s forwards}
+.tl.d8{animation:tin .2s ease 1.95s forwards}
+.tl.d9{animation:tin .2s ease 2.15s forwards}
+.tl.d10{animation:tin .2s ease 2.7s forwards}
+@keyframes tin{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+.tl .ok{color:var(--hero-green);flex-shrink:0}
+.tl .warn{color:#E8A020;flex-shrink:0}
+.tl .sep{color:var(--hero-dim);flex-shrink:0}
+.tl .v{color:#FAFAF8;font-weight:600}
+.tl .lb{color:#8899AA}
+.tl .stat{color:var(--hero-green);font-weight:700}
+
+.cursor{display:inline-block;width:8px;height:13px;background:var(--hero-amber);vertical-align:text-bottom;opacity:0;animation:blink 1.1s step-end 3s infinite}
+@keyframes blink{0%{opacity:1}50%{opacity:0}100%{opacity:1}}
+
+/* STICKY PRINT BAR */
+.print-bar{background:#fff;border-bottom:1px solid var(--border);padding:10px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20}
+.print-bar-lbl{font-size:12px;color:var(--muted)}
+.print-bar-lbl strong{font-family:var(--mono);color:var(--text);font-size:11px}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:var(--r);padding:8px 18px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);letter-spacing:.02em}
+.btn:hover{opacity:.88}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* WRAP */
+.wrap{max-width:900px;margin:0 auto;padding:0 28px 80px}
+
+/* PART HEADER */
+.ph{border-top:3px solid var(--accent);padding-top:34px;margin-top:52px;margin-bottom:30px}
+.ph.blue{border-top-color:var(--blue)}
+.ph-eye{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:5px}
+.ph.blue .ph-eye{color:var(--blue)}
+.ph-title{font-size:23px;font-weight:700;color:var(--text);line-height:1.2}
+.ph-desc{font-size:13px;color:var(--muted);margin-top:5px}
+
+/* STAT GRID */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px}
+.stat-card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:18px 16px 16px;position:relative}
+.stat-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:0 0 var(--r) var(--r);background:var(--accent)}
+.stat-card.bl::after{background:var(--blue)}
+.stat-card.gr::after{background:var(--green)}
+.stat-card.sl::after{background:#4A5568}
+.stat-num{font-family:var(--mono);font-size:38px;font-weight:700;line-height:1;color:var(--text);margin-bottom:4px}
+.stat-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:5px}
+
+/* PAGE CARDS */
+.page-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:26px}
+.page-card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:22px 20px}
+.pct{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.pname{font-size:15px;font-weight:700;color:var(--text)}
+.proute{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px}
+.pnum{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--blue);line-height:1}
+.pnum-lbl{font-size:10px;color:var(--muted);text-align:right;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.frows{display:flex;flex-direction:column;gap:5px}
+.frow{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:var(--ground-alt);border-radius:3px;font-size:12px}
+.fn{color:var(--text)}
+.fc{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--muted);background:#fff;border:1px solid var(--border);padding:1px 6px;border-radius:3px}
+
+/* CHART */
+.chart-wrap{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:20px 20px 14px;margin-bottom:26px;overflow-x:auto}
+.chart-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:12px}
+.chart-legend{display:flex;gap:20px;margin-top:10px}
+.cl-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.cl-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+canvas#dist{display:block}
+
+/* PIPELINE */
+.pipeline-wrap{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:22px 20px;margin-bottom:26px}
+.sub-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:16px}
+.pl-flow{display:flex;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+.pl-stage{display:flex;flex-direction:column;align-items:center}
+.pl-box{background:var(--ground-alt);border:1px solid var(--border);border-radius:4px;padding:8px 14px;font-size:12px;font-weight:600;color:var(--text);white-space:nowrap}
+.pl-box.al{border-color:var(--blue);background:rgba(37,88,200,.05);color:var(--blue)}
+.pl-box.cd{border-color:var(--accent);background:rgba(201,122,8,.06);color:var(--accent)}
+.pl-note{font-size:9px;color:var(--muted);margin-top:4px;text-align:center}
+.pl-arr{font-size:12px;color:var(--border);padding:0 8px;padding-bottom:14px}
+.sched-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.si{background:var(--ground-alt);border-radius:4px;padding:10px 12px}
+.sk{font-size:11px;color:var(--muted);margin-bottom:2px}
+.sv{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text)}
+
+/* LIGHTHOUSE */
+.lh-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.lh-card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:18px 14px;text-align:center}
+.lh-cat{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin-bottom:8px}
+.lh-score{font-family:var(--mono);font-size:30px;font-weight:700;line-height:1;margin-bottom:6px}
+.lh-score.p{color:var(--green)}
+.lh-score.w{color:var(--accent)}
+.lh-thresh{font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--ground-alt);padding:2px 7px;border-radius:3px;display:inline-block;margin-bottom:5px}
+.lh-sev{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.lh-sev.e{color:var(--red)}
+.lh-sev.w{color:var(--accent)}
+.lh-urls{background:var(--ground-alt);border-radius:4px;padding:12px 14px;display:flex;flex-direction:column;gap:7px;margin-bottom:26px}
+.lh-url-row{display:flex;align-items:center;gap:10px;font-size:12px}
+.lh-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);flex-shrink:0}
+.lh-path{font-family:var(--mono);font-size:12px;color:var(--blue)}
+.lh-desc{color:var(--muted);font-size:11px}
+
+/* DETAIL TABLES */
+.suite-block{margin-bottom:38px}
+.suite-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--border)}
+.sname{font-size:15px;font-weight:700;color:var(--text)}
+.sfile{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+.stot{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--blue)}
+.stot-lbl{font-size:10px;color:var(--muted);text-align:right;text-transform:uppercase;letter-spacing:.06em}
+.tt{width:100%;border-collapse:collapse;font-size:12.5px}
+.tt thead th{text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:6px 10px;background:var(--ground-alt);border-bottom:2px solid var(--border)}
+.gh td{padding:7px 10px 5px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);background:var(--ground);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.tr td{padding:7px 10px;border-bottom:1px solid rgba(0,0,0,.04);vertical-align:top}
+.tr:last-child td{border-bottom:none}
+.tr:nth-child(even) td{background:rgba(0,0,0,.012)}
+.tdesc{color:var(--text);line-height:1.4}
+
+.tag{display:inline-block;font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+.tag.pos{background:rgba(20,111,72,.1);color:var(--green)}
+.tag.neg{background:rgba(184,42,28,.1);color:var(--red)}
+.tag.edge{background:rgba(201,122,8,.1);color:var(--accent)}
+.tag.nav{background:rgba(37,88,200,.1);color:var(--blue)}
+.tag.ui{background:rgba(28,35,51,.08);color:#4A5568}
+.tag.skip{background:#f0f0f0;color:#999}
+
+/* INFRA */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+.info-card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:18px}
+.ict{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.ir{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:12px}
+.ik{color:var(--muted)}
+.iv{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text)}
+
+@media(max-width:640px){
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .page-grid{grid-template-columns:1fr}
+  .lh-grid{grid-template-columns:repeat(2,1fr)}
+  .two-col{grid-template-columns:1fr}
+  .sched-grid{grid-template-columns:1fr}
+  .hero{padding:36px 20px 32px}
+  .wrap{padding:0 16px 60px}
+  .print-bar{display:none}
+}
+</style>
+
+<!-- HERO: terminal readout — the aesthetic risk. Earned because every tool in this pipeline is CLI-first: Jenkins, Playwright, Docker. -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-prompt"><span>jenkins@vahan-ci</span>:~/workspace/lead-gen-tests$ ./generate-coverage-report.sh</div>
+    <div class="tsep s0">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+    <div class="tl d1"><span class="ok">▶</span><span class="lb">project&nbsp;&nbsp;&nbsp;</span><span class="v">Vahan Lead Generation — Automation Coverage Report</span></div>
+    <div class="tl d2"><span class="ok">▶</span><span class="lb">generated&nbsp;</span><span class="v">2026-06-24</span><span class="lb">&nbsp;·&nbsp;branch</span><span class="v">main</span></div>
+    <div class="tl d3"><span class="sep">─</span></div>
+    <div class="tl d4"><span class="ok">✓</span><span class="stat">72</span><span class="lb">tests registered across 22 describe blocks</span></div>
+    <div class="tl d5"><span class="ok">✓</span><span class="stat">2</span><span class="lb">pages under continuous end-to-end test (Jobs, RiderHub)</span></div>
+    <div class="tl d6"><span class="ok">✓</span><span class="stat">3</span><span class="lb">URLs monitored by Lighthouse CI every Monday</span></div>
+    <div class="tl d7"><span class="ok">✓</span><span class="stat">1</span><span class="lb">Jenkins pipeline — daily 10:00 AM, 4 parallel workers</span></div>
+    <div class="tl d8"><span class="ok">✓</span><span class="stat">4</span><span class="lb">Lighthouse thresholds enforced (Perf, A11y, Best Practices, SEO)</span></div>
+    <div class="tl d9"><span class="warn">!</span><span class="stat" style="color:#E8A020">1</span><span class="lb">browser in scope — Chromium desktop only (Firefox/WebKit not tested)</span></div>
+    <div class="tsep s1">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+    <div class="tl d10"><span class="ok">▶</span><span class="lb">status&nbsp;&nbsp;&nbsp;&nbsp;</span><span style="color:var(--hero-green);font-weight:700;letter-spacing:.06em">OPERATIONAL</span><span class="cursor"></span></div>
+  </div>
+</div>
+
+<!-- STICKY BAR -->
+<div class="print-bar no-print">
+  <span class="print-bar-lbl">Vahan Lead Gen &nbsp;·&nbsp; <strong>automation-coverage-report.pdf</strong></span>
+  <button class="btn" onclick="window.print()">Export PDF</button>
+</div>
+
+<div class="wrap">
+
+  <!-- ══════════════════════════════════════════ -->
+  <!--  PART I · EXECUTIVE SUMMARY               -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="ph">
+    <div class="ph-eye">Part I</div>
+    <div class="ph-title">Executive Summary</div>
+    <div class="ph-desc">What the suite covers, how it runs, and what it enforces — one page.</div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-num">72</div>
+      <div class="stat-lbl">Automated Tests</div>
+      <div class="stat-sub">41 Jobs page · 31 RiderHub</div>
+    </div>
+    <div class="stat-card bl">
+      <div class="stat-num">2</div>
+      <div class="stat-lbl">Pages Covered</div>
+      <div class="stat-sub">Jobs listing · RiderHub + video detail</div>
+    </div>
+    <div class="stat-card gr">
+      <div class="stat-num">365</div>
+      <div class="stat-lbl">Playwright Runs/yr</div>
+      <div class="stat-sub">Daily at ~10:00 AM via Jenkins cron</div>
+    </div>
+    <div class="stat-card sl">
+      <div class="stat-num">52</div>
+      <div class="stat-lbl">Lighthouse Runs/yr</div>
+      <div class="stat-sub">Every Monday · 3 URLs · 3 runs each</div>
+    </div>
+  </div>
+
+  <div class="page-grid">
+    <div class="page-card">
+      <div class="pct">
+        <div><div class="pname">Jobs Page</div><div class="proute">/jobs/</div></div>
+        <div style="text-align:right"><div class="pnum">41</div><div class="pnum-lbl">tests</div></div>
+      </div>
+      <div class="frows">
+        <div class="frow"><span class="fn">UI element validation</span><span class="fc">1</span></div>
+        <div class="frow"><span class="fn">Filter interactions (positive + edge)</span><span class="fc">6</span></div>
+        <div class="frow"><span class="fn">Pagination</span><span class="fc">2</span></div>
+        <div class="frow"><span class="fn">Alert Me form (positive + validation)</span><span class="fc">8</span></div>
+        <div class="frow"><span class="fn">WhatsApp CTA navigation</span><span class="fc">5</span></div>
+        <div class="frow"><span class="fn">Language switching (EN / HI / KN)</span><span class="fc">5</span></div>
+        <div class="frow"><span class="fn">FAQ accordion behaviour</span><span class="fc">4</span></div>
+        <div class="frow"><span class="fn">Testimonial carousel</span><span class="fc">3</span></div>
+        <div class="frow"><span class="fn">Footer links + social</span><span class="fc">7</span></div>
+      </div>
+    </div>
+    <div class="page-card">
+      <div class="pct">
+        <div><div class="pname">RiderHub Page</div><div class="proute">/rider-adda/ + /rider-adda/&lt;slug&gt;/</div></div>
+        <div style="text-align:right"><div class="pnum">31</div><div class="pnum-lbl">tests</div></div>
+      </div>
+      <div class="frows">
+        <div class="frow"><span class="fn">UI element validation</span><span class="fc">1</span></div>
+        <div class="frow"><span class="fn">Video category filters</span><span class="fc">4</span></div>
+        <div class="frow"><span class="fn">Video card → detail navigation</span><span class="fc">1</span></div>
+        <div class="frow"><span class="fn">Video detail page (YouTube, CTA, i18n)</span><span class="fc">7</span></div>
+        <div class="frow"><span class="fn">Blog section</span><span class="fc">3</span></div>
+        <div class="frow"><span class="fn">Alert Me form (positive + validation)</span><span class="fc">6</span></div>
+        <div class="frow"><span class="fn">Footer Contact form</span><span class="fc">3</span></div>
+        <div class="frow"><span class="fn">Language switching (EN / HI)</span><span class="fc">3</span></div>
+        <div class="frow"><span class="fn">Browse Jobs CTA + edge cases + back-nav</span><span class="fc">3</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CANVAS CHART -->
+  <div class="chart-wrap">
+    <div class="chart-title">Test count by feature group</div>
+    <canvas id="dist" height="504"></canvas>
+    <div class="chart-legend">
+      <div class="cl-item"><div class="cl-dot" style="background:var(--accent)"></div>Jobs Page (41 tests)</div>
+      <div class="cl-item"><div class="cl-dot" style="background:var(--blue)"></div>RiderHub Page (31 tests)</div>
+    </div>
+  </div>
+
+  <!-- PIPELINE -->
+  <div class="pipeline-wrap">
+    <div class="sub-title">Jenkins Pipeline — Stage Flow</div>
+    <div class="pl-flow">
+      <div class="pl-stage"><div class="pl-box al">Checkout</div><div class="pl-note">always</div></div>
+      <div class="pl-arr">→</div>
+      <div class="pl-stage"><div class="pl-box al">Build Docker Image</div><div class="pl-note">always</div></div>
+      <div class="pl-arr">→</div>
+      <div class="pl-stage"><div class="pl-box al">Run Playwright Tests</div><div class="pl-note">always · 4 workers</div></div>
+      <div class="pl-arr">→</div>
+      <div class="pl-stage"><div class="pl-box cd">Lighthouse CI</div><div class="pl-note">Mon only (cron) · always (manual)</div></div>
+      <div class="pl-arr">→</div>
+      <div class="pl-stage"><div class="pl-box al">Slack Notification</div><div class="pl-note">always · 4 message variants</div></div>
+    </div>
+    <div class="sched-grid">
+      <div class="si"><div class="sk">Playwright schedule</div><div class="sv">H 10 * * * (daily)</div></div>
+      <div class="si"><div class="sk">Lighthouse schedule</div><div class="sv">Mondays only (cron)</div></div>
+      <div class="si"><div class="sk">Timeout / concurrency</div><div class="sv">30 min · no parallel builds</div></div>
+    </div>
+  </div>
+
+  <!-- LIGHTHOUSE -->
+  <div class="sub-title" style="margin-bottom:12px">Lighthouse — Enforced Thresholds</div>
+  <div class="lh-grid">
+    <div class="lh-card">
+      <div class="lh-cat">Performance</div>
+      <div class="lh-score p">≥90</div>
+      <div><div class="lh-thresh">minScore: 0.9</div></div>
+      <div class="lh-sev e" style="margin-top:5px">BUILD FAILS</div>
+    </div>
+    <div class="lh-card">
+      <div class="lh-cat">Accessibility</div>
+      <div class="lh-score p">≥90</div>
+      <div><div class="lh-thresh">minScore: 0.9</div></div>
+      <div class="lh-sev e" style="margin-top:5px">BUILD FAILS</div>
+    </div>
+    <div class="lh-card">
+      <div class="lh-cat">Best Practices</div>
+      <div class="lh-score w">≥80</div>
+      <div><div class="lh-thresh">minScore: 0.8</div></div>
+      <div class="lh-sev w" style="margin-top:5px">WARNING ONLY</div>
+    </div>
+    <div class="lh-card">
+      <div class="lh-cat">SEO</div>
+      <div class="lh-score p">100</div>
+      <div><div class="lh-thresh">minScore: 1.0</div></div>
+      <div class="lh-sev e" style="margin-top:5px">BUILD FAILS</div>
+    </div>
+  </div>
+  <div class="lh-urls">
+    <div class="lh-url-row"><div class="lh-dot"></div><span class="lh-path">/jobs/</span><span class="lh-desc">— Job listings, filters, and application CTAs</span></div>
+    <div class="lh-url-row"><div class="lh-dot"></div><span class="lh-path">/rider-adda/</span><span class="lh-desc">— RiderHub video hub and blog section</span></div>
+    <div class="lh-url-row"><div class="lh-dot"></div><span class="lh-path">/blog/</span><span class="lh-desc">— Blog listing page</span></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!--  PART II · DETAILED TEST BREAKDOWN        -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="ph">
+    <div class="ph-eye">Part II</div>
+    <div class="ph-title">Detailed Test Breakdown</div>
+    <div class="ph-desc">Every test by suite, group, and type.&nbsp;
+      <span style="display:inline-flex;gap:5px;align-items:center;vertical-align:middle;flex-wrap:wrap">
+        <span class="tag pos">positive</span>
+        <span class="tag neg">validation</span>
+        <span class="tag edge">edge</span>
+        <span class="tag nav">navigation</span>
+        <span class="tag ui">ui</span>
+        <span class="tag skip">skipped</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- ─── JOBS: UI VALIDATION ─── -->
+  <div class="suite-block">
+    <div class="suite-hdr">
+      <div><div class="sname">Jobs Page — UI Element Validation</div><div class="sfile">tests/jobs/jobsPageTests.spec.ts</div></div>
+      <div style="text-align:right"><div class="stot">1</div><div class="stot-lbl">test</div></div>
+    </div>
+    <table class="tt">
+      <thead><tr><th style="width:62%">Test</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr class="gh"><td colspan="3">UI Validation</td></tr>
+        <tr class="tr"><td class="tdesc">All page sections have the expected elements — header, language dropdown, hero, filters, job listings, alert form, benefits, testimonials, FAQ, footer</td><td><span class="tag ui">ui</span></td><td style="font-size:11px;color:var(--muted)">Multi-step check with visual gold-outline highlighting</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ─── JOBS: INTERACTIONS ─── -->
+  <div class="suite-block">
+    <div class="suite-hdr">
+      <div><div class="sname">Jobs Page — Interaction Tests</div><div class="sfile">tests/jobs/jobsPageInteractionTests.spec.ts</div></div>
+      <div style="text-align:right"><div class="stot">40</div><div class="stot-lbl">tests</div></div>
+    </div>
+    <table class="tt">
+      <thead><tr><th style="width:62%">Test</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr class="gh"><td colspan="3">Filter Interactions — Positive</td></tr>
+        <tr class="tr"><td class="tdesc">Selecting a city option changes the job count and still shows results</td><td><span class="tag pos">positive</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Selecting a company filter shows results for that company</td><td><span class="tag pos">positive</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Applying city then company filters both have visible effects</td><td><span class="tag pos">positive</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Filter Interactions — Edge Cases</td></tr>
+        <tr class="tr"><td class="tdesc">Applying a filter after navigating to page 2 resets listing to page 1</td><td><span class="tag edge">edge</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Rapidly switching city options does not leave the page in a broken state</td><td><span class="tag edge">edge</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Zero-results filter combination shows no-results state gracefully</td><td><span class="tag skip">skipped</span></td><td style="font-size:11px;color:var(--muted)">Needs a known zero-result dataset</td></tr>
+
+        <tr class="gh"><td colspan="3">Pagination</td></tr>
+        <tr class="tr"><td class="tdesc">Page 2 shows the next sequential batch of jobs</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Job count label is consistent with visible job cards</td><td><span class="tag ui">ui</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Alert Me Form — Positive</td></tr>
+        <tr class="tr"><td class="tdesc">Valid area name + phone number navigates to Vahan WhatsApp with correct pre-filled message</td><td><span class="tag pos">positive</span></td><td style="font-size:11px;color:var(--muted)">Intercepts wa.me / api.whatsapp.com</td></tr>
+
+        <tr class="gh"><td colspan="3">Alert Me Form — Validation</td></tr>
+        <tr class="tr"><td class="tdesc">Empty phone number does not navigate to WhatsApp</td><td><span class="tag neg">validation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Area name is optional — form submits with a valid phone number alone</td><td><span class="tag neg">validation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Phone number shorter than 10 digits does not submit</td><td><span class="tag neg">validation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Non-numeric phone does not submit</td><td><span class="tag neg">validation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Area alone without a phone number does not enable the submit button</td><td><span class="tag neg">validation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Phone with internal space either strips the space or is rejected</td><td><span class="tag neg">validation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Duplicate submission of the same number is handled gracefully</td><td><span class="tag edge">edge</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">CTA — WhatsApp Navigation</td></tr>
+        <tr class="tr"><td class="tdesc">Hero "Apply Now" button navigates to WhatsApp</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Job card "APPLY NOW" button navigates to WhatsApp</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Footer "Contact Me" button navigates to WhatsApp after entering a phone</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">"GET STARTED" link has a non-empty href target</td><td><span class="tag ui">ui</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">"Know More" link on first job card navigates to a job detail page</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Language Switching</td></tr>
+        <tr class="tr"><td class="tdesc">Switching to Hindi changes hero heading to Devanagari script</td><td><span class="tag pos">positive</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Switching to Kannada changes hero heading to Kannada script</td><td><span class="tag pos">positive</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Switching back to English from Hindi restores the English heading</td><td><span class="tag pos">positive</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Language switch with an active filter does not crash the page</td><td><span class="tag edge">edge</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Long translated strings do not overflow or break the nav layout</td><td><span class="tag edge">edge</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">FAQ Accordion</td></tr>
+        <tr class="tr"><td class="tdesc">Clicking a FAQ question toggles its aria-expanded state</td><td><span class="tag pos">positive</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Clicking the same FAQ question twice returns it to its original state</td><td><span class="tag edge">edge</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Opening a second FAQ while the first is open works correctly</td><td><span class="tag edge">edge</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Each FAQ question can be individually opened</td><td><span class="tag pos">positive</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Testimonial Carousel</td></tr>
+        <tr class="tr"><td class="tdesc">Clicking Next advances the carousel without crashing</td><td><span class="tag pos">positive</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Clicking Previous from the first testimonial does not crash</td><td><span class="tag edge">edge</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Clicking Next then Previous leaves the carousel functional</td><td><span class="tag edge">edge</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Footer Link Navigation</td></tr>
+        <tr class="tr"><td class="tdesc">Privacy Policy link navigates to a privacy page</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Terms &amp; Conditions link navigates to a terms page</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Email link uses mailto: scheme with correct address</td><td><span class="tag ui">ui</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">LinkedIn icon links to linkedin.com</td><td><span class="tag ui">ui</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">YouTube icon links to youtube.com</td><td><span class="tag ui">ui</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">For Job-Seekers footer link points to the jobs page</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Blog footer link points to the blog listing page</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ─── RIDERHUB: UI VALIDATION ─── -->
+  <div class="suite-block">
+    <div class="suite-hdr">
+      <div><div class="sname">RiderHub Page — UI Element Validation</div><div class="sfile">tests/riderHub/riderHubPageTests.spec.ts</div></div>
+      <div style="text-align:right"><div class="stot">1</div><div class="stot-lbl">test</div></div>
+    </div>
+    <table class="tt">
+      <thead><tr><th style="width:62%">Test</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr class="gh"><td colspan="3">UI Validation</td></tr>
+        <tr class="tr"><td class="tdesc">All page sections have the expected elements — hero, video filter tabs, video cards, alert form, blog section, Browse All Jobs CTA, footer</td><td><span class="tag ui">ui</span></td><td style="font-size:11px;color:var(--muted)">Multi-step check with visual highlighting</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ─── RIDERHUB: INTERACTIONS ─── -->
+  <div class="suite-block">
+    <div class="suite-hdr">
+      <div><div class="sname">RiderHub Page — Interaction Tests</div><div class="sfile">tests/riderHub/riderHubPageInteractionTests.spec.ts</div></div>
+      <div style="text-align:right"><div class="stot">30</div><div class="stot-lbl">tests</div></div>
+    </div>
+    <table class="tt">
+      <thead><tr><th style="width:62%">Test</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr class="gh"><td colspan="3">Video Category Filters</td></tr>
+        <tr class="tr"><td class="tdesc">All category filter tabs are visible on page load</td><td><span class="tag ui">ui</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Selecting a category filter shows videos without crashing</td><td><span class="tag pos">positive</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Only one filter tab is active at a time</td><td><span class="tag pos">positive</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Clicking ALL after a category filter restores the full video list</td><td><span class="tag pos">positive</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Video Card Navigation</td></tr>
+        <tr class="tr"><td class="tdesc">Clicking a video card navigates to its detail page</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Video Detail Page</td></tr>
+        <tr class="tr"><td class="tdesc">Shows embedded YouTube player and a non-empty title</td><td><span class="tag pos">positive</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">View count is visible and in a recognisable format</td><td><span class="tag ui">ui</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">"Apply on WhatsApp" button navigates to WhatsApp</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Switching description language to Hindi shows Devanagari text</td><td><span class="tag pos">positive</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Switching description language to Kannada shows Kannada script</td><td><span class="tag skip">skipped</span></td><td style="font-size:11px;color:var(--muted)">Skipped if Kannada translation unavailable</td></tr>
+        <tr class="tr"><td class="tdesc">Switching back to English from Hindi restores English text</td><td><span class="tag pos">positive</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Clicking a "More Videos" card navigates to a different detail page</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Blog Section</td></tr>
+        <tr class="tr"><td class="tdesc">Blog cards are visible with at least one entry</td><td><span class="tag ui">ui</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Clicking a blog card navigates to its detail page</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">"SEE MORE BLOGS" navigates to the blog listing page</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Alert Me Form — Positive</td></tr>
+        <tr class="tr"><td class="tdesc">Valid phone alone navigates to WhatsApp</td><td><span class="tag pos">positive</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Alert Me Form — Validation</td></tr>
+        <tr class="tr"><td class="tdesc">Empty phone does not navigate to WhatsApp</td><td><span class="tag neg">validation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Phone shorter than 10 digits does not submit</td><td><span class="tag neg">validation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Non-numeric phone does not submit</td><td><span class="tag neg">validation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Area alone without phone does not enable the submit button</td><td><span class="tag neg">validation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Phone with internal space either strips the space or is rejected</td><td><span class="tag neg">validation</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Footer Contact Me — Positive</td></tr>
+        <tr class="tr"><td class="tdesc">Valid phone navigates to WhatsApp</td><td><span class="tag pos">positive</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Footer Contact Me — Validation</td></tr>
+        <tr class="tr"><td class="tdesc">Empty footer phone does not navigate to WhatsApp</td><td><span class="tag neg">validation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Phone shorter than 10 digits does not navigate to WhatsApp</td><td><span class="tag neg">validation</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Language Switching</td></tr>
+        <tr class="tr"><td class="tdesc">Switching to Hindi changes hero heading to Devanagari script</td><td><span class="tag pos">positive</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Switching to Kannada changes hero heading to Kannada script</td><td><span class="tag skip">skipped</span></td><td style="font-size:11px;color:var(--muted)">No RiderHub Kannada translation yet</td></tr>
+        <tr class="tr"><td class="tdesc">Switching back to English from Hindi restores the English heading</td><td><span class="tag pos">positive</span></td><td></td></tr>
+
+        <tr class="gh"><td colspan="3">Filter Edge Cases · Navigation</td></tr>
+        <tr class="tr"><td class="tdesc">Rapid filter switching does not leave the page broken</td><td><span class="tag edge">edge</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">"BROWSE ALL JOBS" navigates to the jobs listing page</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+        <tr class="tr"><td class="tdesc">Browser back from detail page returns to RiderHub listing</td><td><span class="tag nav">navigation</span></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!--  PART III · INFRASTRUCTURE                -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="ph blue">
+    <div class="ph-eye">Part III</div>
+    <div class="ph-title">Infrastructure &amp; Configuration</div>
+    <div class="ph-desc">Framework settings, execution environment, and delivery pipeline config.</div>
+  </div>
+
+  <div class="two-col">
+    <div class="info-card">
+      <div class="ict">Playwright Config</div>
+      <div class="ir"><span class="ik">Framework</span><span class="iv">@playwright/test v1.60.0</span></div>
+      <div class="ir"><span class="ik">Language</span><span class="iv">TypeScript</span></div>
+      <div class="ir"><span class="ik">Browser</span><span class="iv">Chromium (desktop only)</span></div>
+      <div class="ir"><span class="ik">Workers (CI)</span><span class="iv">4 parallel</span></div>
+      <div class="ir"><span class="ik">Retries (CI)</span><span class="iv">1 on failure</span></div>
+      <div class="ir"><span class="ik">Test timeout</span><span class="iv">30 000 ms</span></div>
+      <div class="ir"><span class="ik">Expect timeout</span><span class="iv">10 000 ms</span></div>
+      <div class="ir"><span class="ik">Geolocation</span><span class="iv">12.9716°N 77.5946°E (Bengaluru)</span></div>
+      <div class="ir"><span class="ik">Trace</span><span class="iv">on-first-retry</span></div>
+      <div class="ir"><span class="ik">Screenshot</span><span class="iv">on-failure only</span></div>
+    </div>
+    <div class="info-card">
+      <div class="ict">Docker Environment</div>
+      <div class="ir"><span class="ik">Base image</span><span class="iv">node:20-bookworm-slim</span></div>
+      <div class="ir"><span class="ik">Chromium</span><span class="iv">Playwright-bundled binary</span></div>
+      <div class="ir"><span class="ik">Install</span><span class="iv">npm ci (reproducible)</span></div>
+      <div class="ir"><span class="ik">Chrome flags</span><span class="iv">--no-sandbox --headless</span></div>
+      <div class="ir"><span class="ik">Image tag scheme</span><span class="iv">lead-gen-tests:$BUILD_NUMBER</span></div>
+      <div class="ir"><span class="ik">Cleanup</span><span class="iv">docker rmi after each build</span></div>
+      <div class="ir"><span class="ik">Incognito</span><span class="iv">No (clean profile per container)</span></div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="info-card">
+      <div class="ict">Artifacts &amp; Reports Generated</div>
+      <div class="ir"><span class="ik">Playwright HTML report</span><span class="iv">playwright-report/</span></div>
+      <div class="ir"><span class="ik">Playwright dashboard PNG</span><span class="iv">playwright-report/dashboard.png</span></div>
+      <div class="ir"><span class="ik">JUnit XML</span><span class="iv">test-results/junit.xml</span></div>
+      <div class="ir"><span class="ik">Lighthouse HTML summary</span><span class="iv">lighthouse-report/summary.html</span></div>
+      <div class="ir"><span class="ik">Lighthouse PNG summary</span><span class="iv">lighthouse-report/summary.png</span></div>
+      <div class="ir"><span class="ik">Issues file</span><span class="iv">lighthouse-report/lhci-issues.txt</span></div>
+      <div class="ir"><span class="ik">Artifact retention</span><span class="iv">Last 1 artifact kept</span></div>
+      <div class="ir"><span class="ik">Build retention</span><span class="iv">Last 10 builds kept</span></div>
+    </div>
+    <div class="info-card">
+      <div class="ict">Slack Notification Logic</div>
+      <div class="ir"><span class="ik">PW pass + LH pass/skip</span><span class="iv">✅ green summary</span></div>
+      <div class="ir"><span class="ik">PW pass + LH fail</span><span class="iv">⚠️ threshold alert</span></div>
+      <div class="ir"><span class="ik">PW fail + LH pass/skip</span><span class="iv">🔴 failed test names</span></div>
+      <div class="ir"><span class="ik">Both PW + LH fail</span><span class="iv">🔴 full incident report</span></div>
+      <div class="ir"><span class="ik">LH skipped (non-Mon)</span><span class="iv">footer note: runs next Monday</span></div>
+      <div class="ir"><span class="ik">Failed test names shown</span><span class="iv">up to 10 in Slack message</span></div>
+      <div class="ir"><span class="ik">Report links</span><span class="iv">PNG artifact URLs in Slack</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  var canvas = document.getElementById('dist');
+  if (!canvas) return;
+
+  var features = [
+    { label: 'Jobs · UI Validation',           count: 1,  page: 'jobs'  },
+    { label: 'Jobs · Filter Interactions',      count: 6,  page: 'jobs'  },
+    { label: 'Jobs · Pagination',               count: 2,  page: 'jobs'  },
+    { label: 'Jobs · Alert Me Form',            count: 8,  page: 'jobs'  },
+    { label: 'Jobs · WhatsApp CTAs',            count: 5,  page: 'jobs'  },
+    { label: 'Jobs · Language Switching',       count: 5,  page: 'jobs'  },
+    { label: 'Jobs · FAQ Accordion',            count: 4,  page: 'jobs'  },
+    { label: 'Jobs · Testimonial Carousel',     count: 3,  page: 'jobs'  },
+    { label: 'Jobs · Footer Links',             count: 7,  page: 'jobs'  },
+    { label: 'RiderHub · UI Validation',        count: 1,  page: 'rider' },
+    { label: 'RiderHub · Video Filters',        count: 4,  page: 'rider' },
+    { label: 'RiderHub · Video Card Nav',       count: 1,  page: 'rider' },
+    { label: 'RiderHub · Video Detail Page',    count: 7,  page: 'rider' },
+    { label: 'RiderHub · Blog Section',         count: 3,  page: 'rider' },
+    { label: 'RiderHub · Alert Me Form',        count: 6,  page: 'rider' },
+    { label: 'RiderHub · Footer Contact',       count: 3,  page: 'rider' },
+    { label: 'RiderHub · Language Switching',   count: 3,  page: 'rider' },
+    { label: 'RiderHub · Browse / Edge / Nav',  count: 3,  page: 'rider' }
+  ];
+
+  var DPR = window.devicePixelRatio || 1;
+  var W = canvas.parentElement.clientWidth - 40;
+  var ROW_H = 28;
+  var LABEL_W = 230;
+  var PAD_V = 6;
+  var H = features.length * ROW_H + PAD_V * 2;
+  var MAX = 0;
+  for (var i = 0; i < features.length; i++) if (features[i].count > MAX) MAX = features[i].count;
+  var BAR_AREA = W - LABEL_W - 40;
+
+  canvas.width  = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  var ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
+
+  var JOBS_C  = '#C97A08';
+  var RIDER_C = '#2558C8';
+  var TEXT_C  = '#1C2333';
+  var MUTED_C = '#5D6A7E';
+  var ALT_BG  = '#F2F1ED';
+
+  for (var i = 0; i < features.length; i++) {
+    var f = features[i];
+    var y = PAD_V + i * ROW_H;
+    var bw = (f.count / MAX) * BAR_AREA;
+
+    if (i % 2 === 0) {
+      ctx.fillStyle = ALT_BG;
+      ctx.fillRect(0, y, W, ROW_H);
+    }
+
+    ctx.font = '11.5px system-ui,-apple-system,sans-serif';
+    ctx.fillStyle = TEXT_C;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillText(f.label, 0, y + ROW_H / 2);
+
+    var bx = LABEL_W;
+    var by = y + ROW_H * 0.22;
+    var bh = ROW_H * 0.56;
+    var rad = 3;
+
+    ctx.fillStyle = f.page === 'jobs' ? JOBS_C : RIDER_C;
+    ctx.beginPath();
+    ctx.moveTo(bx + rad, by);
+    ctx.lineTo(bx + bw - rad, by);
+    ctx.arcTo(bx + bw, by, bx + bw, by + rad, rad);
+    ctx.lineTo(bx + bw, by + bh - rad);
+    ctx.arcTo(bx + bw, by + bh, bx + bw - rad, by + bh, rad);
+    ctx.lineTo(bx + rad, by + bh);
+    ctx.arcTo(bx, by + bh, bx, by + bh - rad, rad);
+    ctx.lineTo(bx, by + rad);
+    ctx.arcTo(bx, by, bx + rad, by, rad);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.font = 'bold 11px ui-monospace,monospace';
+    ctx.fillStyle = MUTED_C;
+    ctx.textAlign = 'left';
+    ctx.fillText(f.count, bx + bw + 7, y + ROW_H / 2);
+  }
+})();
+</script>

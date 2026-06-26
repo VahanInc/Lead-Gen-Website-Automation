@@ -11,11 +11,12 @@ const HTML_PATH    = path.join(REPORT_DIR, 'summary.html');
 const PNG_PATH     = path.join(REPORT_DIR, 'summary.png');
 const ISSUES_PATH  = path.join(REPORT_DIR, 'lhci-issues.txt');
 
-// Must match .lighthouserc.js error assertions
+// Performance threshold overridable via env var (e.g. 0.5 for mobile)
+const PERF_MIN = parseFloat(process.env.PERF_MIN_SCORE || '0.9');
 const ERROR_THRESHOLDS = {
-  performance:   { min: 0.9, label: 'Performance',  display: 90  },
-  accessibility: { min: 0.9, label: 'Accessibility', display: 90  },
-  seo:           { min: 1.0, label: 'SEO',           display: 100 },
+  performance:   { min: PERF_MIN, label: 'Performance',  display: Math.round(PERF_MIN * 100) },
+  accessibility: { min: 0.9,      label: 'Accessibility', display: 90  },
+  seo:           { min: 1.0,      label: 'SEO',           display: 100 },
 };
 
 // ── score helpers ─────────────────────────────────────────────────────────────

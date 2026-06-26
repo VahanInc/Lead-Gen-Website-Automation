@@ -73,7 +73,7 @@ pipeline {
 
                                 CHROME_PATH=\$CHROME npx lhci autorun --config=.lighthouserc.mobile.js
                                 MOB_EXIT=\$?
-                                REPORT_DIR=/app/lighthouse-report-mobile REPORT_LABEL="Lighthouse Mobile" node scripts/generate-lighthouse-report.js 2>/dev/null || true
+                                REPORT_DIR=/app/lighthouse-report-mobile REPORT_LABEL="Lighthouse Mobile" PERF_MIN_SCORE=0.5 node scripts/generate-lighthouse-report.js 2>/dev/null || true
 
                                 if [ \$DESK_EXIT -ne 0 ] || [ \$MOB_EXIT -ne 0 ]; then exit 1; else exit 0; fi
                             '

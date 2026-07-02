@@ -50,7 +50,7 @@ pipeline {
             when {
                 expression {
                     // Cron builds: run only on Mondays (IST). Manual builds: always run.
-                    def isTimer = currentBuild.getBuildCauses().toString().contains('TimerTrigger')
+                    def isTimer = currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').size() > 0
                     def cal = Calendar.getInstance(TimeZone.getTimeZone('Asia/Kolkata'))
                     return !isTimer || cal.get(Calendar.DAY_OF_WEEK) == Calendar.MONDAY
                 }

@@ -12,6 +12,7 @@ module.exports = {
       settings: {
         chromeFlags: '--no-sandbox --headless --disable-gpu --disable-dev-shm-usage',
         formFactor: 'mobile',
+        throttlingMethod: 'provided',
         screenEmulation: {
           mobile: true,
           width: 390,

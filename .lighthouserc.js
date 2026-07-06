@@ -8,7 +8,7 @@ module.exports = {
         `${BASE_URL}/rider-adda/`,
         `${BASE_URL}/blog/`,
       ],
-      numberOfRuns: 3,
+      numberOfRuns: 2,
       settings: {
         chromeFlags: '--no-sandbox --headless --disable-gpu --disable-dev-shm-usage',
         preset: 'desktop',

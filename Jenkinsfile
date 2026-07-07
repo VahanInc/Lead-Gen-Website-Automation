@@ -21,6 +21,9 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+                // Prevent stale results from a prior Lighthouse run being
+                // mistaken for this build's result when the stage is skipped.
+                sh 'rm -rf lighthouse-report lighthouse-report-mobile'
             }
         }
 

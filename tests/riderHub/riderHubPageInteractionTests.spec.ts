@@ -89,6 +89,9 @@ test.describe('Video detail page', () => {
   test('shows embedded YouTube player and a non-empty title', async ({ page }) => {
     const detail = new VideoDetailPage(page);
 
+    // The player shows a thumbnail + play button until clicked; the YouTube
+    // iframe is only mounted once the user starts playback.
+    await detail.playButton.click();
     await expect(detail.youtubeIframe).toBeVisible({ timeout: 10000 });
     await expect(detail.videoTitle).toBeVisible();
     const title = await detail.videoTitle.textContent();

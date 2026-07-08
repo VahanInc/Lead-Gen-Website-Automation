@@ -95,6 +95,9 @@ export class RiderHubPage extends BasePage {
 }
 
 export class VideoDetailPage {
+  // Player shows a thumbnail with this button until clicked; the YouTube iframe
+  // is only mounted afterwards.
+  readonly playButton: Locator;
   readonly youtubeIframe: Locator;
   readonly videoTitle: Locator;
   readonly viewCount: Locator;
@@ -109,6 +112,7 @@ export class VideoDetailPage {
     // so we also use .first() on each.
     const main = page.locator('main');
 
+    this.playButton = main.getByRole('button', { name: /^Play video:/ });
     this.youtubeIframe = page.locator('iframe[src*="youtube"]');
     this.videoTitle = main.getByRole('heading', { level: 1 });
     // Sidebar "More Videos" cards also show view counts in <span> elements;

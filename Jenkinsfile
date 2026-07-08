@@ -23,7 +23,10 @@ pipeline {
                 checkout scm
                 // Prevent stale results from a prior Lighthouse run being
                 // mistaken for this build's result when the stage is skipped.
-                sh 'rm -rf lighthouse-report lighthouse-report-mobile'
+                // These files are written by root inside the lhci container,
+                // so they must also be removed as root via a throwaway container
+                // rather than a plain host-side rm (which gets Permission denied).
+                sh 'docker run --rm -v $WORKSPACE:/workspace alpine rm -rf /workspace/lighthouse-report /workspace/lighthouse-report-mobile'
             }
         }
 

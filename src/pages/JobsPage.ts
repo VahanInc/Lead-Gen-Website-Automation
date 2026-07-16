@@ -3,7 +3,7 @@ import { ROUTES } from '../constants/urls';
 import { BasePage } from './BasePage';
 
 export const WHATSAPP_URL_PATTERN = /api\.whatsapp\.com|wa\.me/;
-export const VAHAN_WHATSAPP_PHONE = '919964051511';
+export const VAHAN_WHATSAPP_PHONE = '919075760960';
 
 export class JobsPage extends BasePage {
   readonly headerNavItems: Record<string, Locator>;

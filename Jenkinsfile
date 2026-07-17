@@ -21,12 +21,33 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
-                // Prevent stale results from a prior Lighthouse run being
-                // mistaken for this build's result when the stage is skipped.
-                // These files are written by root inside the lhci container,
-                // so they must also be removed as root via a throwaway container
-                // rather than a plain host-side rm (which gets Permission denied).
-                sh 'docker run --rm -v $WORKSPACE:/workspace alpine rm -rf /workspace/lighthouse-report /workspace/lighthouse-report-mobile'
+                // Prevent stale results from a prior run being mistaken for this
+                // build's result when a later stage fails or is skipped (e.g. the
+                // Docker build stage failing before Playwright ever runs must not
+                // leave a passing junit.xml from the last successful build behind).
+                // These files are written by root inside the containers, so they
+                // must also be removed as root via a throwaway container rather
+                // than a plain host-side rm (which gets Permission denied).
+                sh 'docker run --rm -v $WORKSPACE:/workspace alpine rm -rf /workspace/lighthouse-report /workspace/lighthouse-report-mobile /workspace/test-results /workspace/playwright-report'
+            }
+        }
+
+        stage('Free disk space') {
+            steps {
+                // Dangling layers and stray images from this project accumulate across
+                // daily builds and can eventually fill the host disk, failing the image
+                // build outright (e.g. ENOSPC while downloading the Chromium binary).
+                // This host may run other Jenkins jobs, so we deliberately avoid
+                // `docker system prune -a` / `--volumes` here — those are daemon-wide
+                // and would delete other jobs' unused images and volumes too. Instead:
+                //   1) remove this project's own leftover lead-gen-tests:* image tags
+                //      (in case a prior run's cleanup step didn't get to run)
+                //   2) remove genuinely dangling (untagged, unreferenced-by-anything)
+                //      image layers — these aren't any other job's tagged image
+                sh '''
+                    docker images "lead-gen-tests" -q | xargs -r docker rmi -f || true
+                    docker image prune -f || true
+                '''
             }
         }
 
@@ -102,8 +123,14 @@ pipeline {
 
             script {
                 try {
-                    def duration = currentBuild.durationString.replace(' and counting', '')
-                    def branch   = env.GIT_BRANCH ?: 'main'
+                    def duration    = currentBuild.durationString.replace(' and counting', '')
+                    def branch      = env.GIT_BRANCH ?: 'main'
+                    // Overall pipeline result — independent of what junit.xml says.
+                    // A stage before "Run tests" (e.g. Docker build) can fail and skip
+                    // Playwright entirely; junit.xml is now wiped at Checkout, so a
+                    // build that never ran tests reports 0/0 rather than reusing a
+                    // prior build's passing results.
+                    def buildResult = currentBuild.currentResult ?: 'SUCCESS'
                     def pwUrl     = "${env.BUILD_URL}artifact/playwright-report/dashboard.png"
                     def lhDeskUrl = "${env.BUILD_URL}artifact/lighthouse-report/summary.png"
                     def lhMobUrl  = "${env.BUILD_URL}artifact/lighthouse-report-mobile/summary.png"
@@ -162,8 +189,16 @@ print('\\\\n'.join(names[:10]))
 
                     // ── Compose message based on which component(s) failed ─────
                     def text
+                    def consoleUrl = "${env.BUILD_URL}console"
 
-                    if (pwFailedInt == 0 && !lhFailed) {
+                    if (pwTotalInt == 0 && buildResult != 'SUCCESS') {
+                        // No tests ran at all (e.g. Docker build/image stage failed
+                        // before Playwright started) — never report this as a pass.
+                        text = ":red_circle: *Lead Gen Tests DID NOT RUN* — Build #${env.BUILD_NUMBER} (${branch})\n" +
+                               "Pipeline failed before Playwright tests could execute (result: ${buildResult}). Likely a Docker build or infra issue.\n" +
+                               "<${consoleUrl}|Console Output>"
+
+                    } else if (pwFailedInt == 0 && !lhFailed && buildResult == 'SUCCESS') {
                         // Playwright green; Lighthouse either passed or skipped
                         text = ":white_check_mark: *Lead Gen Tests PASSED* — ${pwTotalInt} tests in ${duration}\n" +
                                "<${pwUrl}|Playwright Report>  |  ${lhFooter}"
@@ -182,13 +217,21 @@ print('\\\\n'.join(names[:10]))
                                "*Failed tests:*\n${failedNames}\n\n" +
                                "<${pwUrl}|Playwright Report>  |  ${lhFooter}"
 
-                    } else {
+                    } else if (pwFailedInt > 0 && lhFailed) {
                         // Both Playwright and Lighthouse failed
                         text = ":red_circle: *Lead Gen Tests FAILED — Playwright + Lighthouse* — Build #${env.BUILD_NUMBER} (${branch})\n" +
                                "*Playwright:* ${pwFailedInt} / ${pwTotalInt} tests failed  |  *Duration:* ${duration}\n\n" +
                                "*Failed tests:*\n${failedNames}" +
                                "${lhBlock}\n\n" +
                                "<${pwUrl}|Playwright Report>  |  ${lhFooter}"
+
+                    } else {
+                        // Safety net: build result isn't SUCCESS but none of the
+                        // above conditions matched (e.g. a post-test stage failed).
+                        // Never fall through silently to a green message.
+                        text = ":red_circle: *Lead Gen Tests — Build Failed* — Build #${env.BUILD_NUMBER} (${branch})\n" +
+                               "Result: ${buildResult}\n" +
+                               "<${consoleUrl}|Console Output>"
                     }
 
                     def payload = groovy.json.JsonOutput.toJson([text: text])

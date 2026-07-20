@@ -2,9 +2,30 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME    = "lead-gen-tests:${env.BUILD_NUMBER}"
         BASE_URL      = credentials('LEAD_GEN_BASE_URL')
         SLACK_WEBHOOK = credentials('SLACK_WEBHOOK_URL')
+        // The K8s Jenkins agent pod (template "default") has no Docker — see the
+        // ENOSPC/"docker: not found" incidents on this job. Tests now run on AWS
+        // CodeBuild instead, following the same pattern the "Lead Generation
+        // Website/Production" job already uses to build & push its Docker image
+        // (S3-zipped context, aws codebuild start-build, polled from Jenkins).
+        //
+        // TODO(owner of the AWS CodeBuild setup — confirm/create before this runs):
+        //   - CODEBUILD_PROJECT: a CodeBuild project running buildspec.yml from this
+        //     repo (Node 20 image, NOT privileged — no Docker needed, see buildspec.yml).
+        //     Distinct from "jenkins-app-build", which only builds+pushes images.
+        //   - CONTEXT_BUCKET / ARTIFACT_BUCKET: confirm whether to reuse
+        //     "vahan-jenkins-build-context" (used by the Production job) or use a
+        //     dedicated bucket/prefix for this job's context zips and test artifacts.
+        //   - The CodeBuild project's service role needs s3:GetObject on the context
+        //     bucket/prefix and s3:PutObject on the artifact bucket/prefix.
+        //   - The Jenkins agent's IAM role (jenkins-agent service account) needs
+        //     s3:PutObject on the context bucket and codebuild:StartBuild /
+        //     codebuild:BatchGetBuilds on CODEBUILD_PROJECT, plus s3:GetObject on the
+        //     artifact bucket to pull results back.
+        CODEBUILD_PROJECT = 'lead-gen-website-tests'
+        CONTEXT_BUCKET    = 'vahan-jenkins-build-context'
+        ARTIFACT_BUCKET   = 'vahan-jenkins-build-context'
     }
 
     options {
@@ -22,94 +43,75 @@ pipeline {
             steps {
                 checkout scm
                 // Prevent stale results from a prior run being mistaken for this
-                // build's result when a later stage fails or is skipped (e.g. the
-                // Docker build stage failing before Playwright ever runs must not
-                // leave a passing junit.xml from the last successful build behind).
-                // These files are written by root inside the containers, so they
-                // must also be removed as root via a throwaway container rather
-                // than a plain host-side rm (which gets Permission denied).
-                sh 'docker run --rm -v $WORKSPACE:/workspace alpine rm -rf /workspace/lighthouse-report /workspace/lighthouse-report-mobile /workspace/test-results /workspace/playwright-report'
+                // build's result when a later stage fails or is skipped. No Docker
+                // on this agent, so these are plain host files now (no more root
+                // ownership from a container) — a normal rm is enough.
+                sh 'rm -rf lighthouse-report lighthouse-report-mobile test-results playwright-report'
             }
         }
 
-        stage('Free disk space') {
-            steps {
-                // Dangling layers and stray images from this project accumulate across
-                // daily builds and can eventually fill the host disk, failing the image
-                // build outright (e.g. ENOSPC while downloading the Chromium binary).
-                // This host may run other Jenkins jobs, so we deliberately avoid
-                // `docker system prune -a` / `--volumes` here — those are daemon-wide
-                // and would delete other jobs' unused images and volumes too. Instead:
-                //   1) remove this project's own leftover lead-gen-tests:* image tags
-                //      (in case a prior run's cleanup step didn't get to run)
-                //   2) remove genuinely dangling (untagged, unreferenced-by-anything)
-                //      image layers — these aren't any other job's tagged image
-                sh '''
-                    docker images "lead-gen-tests" -q | xargs -r docker rmi -f || true
-                    docker image prune -f || true
-                '''
-            }
-        }
-
-        stage('Build image') {
-            steps {
-                sh "docker build -t ${IMAGE_NAME} ."
-            }
-        }
-
-        stage('Run tests') {
+        stage('Run tests on CodeBuild') {
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                    sh """
-                        docker run --rm \
-                            -e CI=true \
-                            -e BASE_URL=${BASE_URL} \
-                            -v ${WORKSPACE}/playwright-report:/app/playwright-report \
-                            -v ${WORKSPACE}/test-results:/app/test-results \
-                            ${IMAGE_NAME} \
-                            sh -c 'npx playwright test --workers=4; PW_EXIT=\$?; node scripts/generate-report.js 2>/dev/null || true; exit \$PW_EXIT'
-                    """
-                }
-            }
-        }
+                    script {
+                        // Cron builds: run Lighthouse only on Mondays (IST). Manual builds: always run.
+                        def isTimer = currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').size() > 0
+                        def cal = Calendar.getInstance(TimeZone.getTimeZone('Asia/Kolkata'))
+                        def runLighthouse = (!isTimer || cal.get(Calendar.DAY_OF_WEEK) == Calendar.MONDAY) as String
 
-        stage('Lighthouse') {
-            when {
-                expression {
-                    // Cron builds: run only on Mondays (IST). Manual builds: always run.
-                    def isTimer = currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').size() > 0
-                    def cal = Calendar.getInstance(TimeZone.getTimeZone('Asia/Kolkata'))
-                    return !isTimer || cal.get(Calendar.DAY_OF_WEEK) == Calendar.MONDAY
-                }
-            }
-            steps {
-                catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                    sh """
-                        docker run --rm \
-                            -e CI=true \
-                            -e BASE_URL=${BASE_URL} \
-                            -v ${WORKSPACE}/lighthouse-report:/app/lighthouse-report \
-                            -v ${WORKSPACE}/lighthouse-report-mobile:/app/lighthouse-report-mobile \
-                            ${IMAGE_NAME} \
-                            sh -c '
-                                CHROME=\$(find /root/.cache/ms-playwright -name chrome -type f 2>/dev/null | head -1)
+                        def safeJobName = env.JOB_NAME.replaceAll('[^A-Za-z0-9._-]', '_')
+                        def contextKey  = "contexts/${safeJobName}-${env.BUILD_NUMBER}.zip"
 
-                                CHROME_PATH=\$CHROME npx lhci autorun --config=.lighthouserc.js
-                                DESK_EXIT=\$?
-                                REPORT_DIR=/app/lighthouse-report REPORT_LABEL="Lighthouse Desktop" node scripts/generate-lighthouse-report.js 2>/dev/null || true
+                        // Ship the repo to S3 as CodeBuild's build context — this
+                        // agent has no Docker, so the actual build/test run happens
+                        // entirely inside CodeBuild (see buildspec.yml at repo root).
+                        sh """
+                            zip -r -q /tmp/context.zip . -x '.git/*' -x 'node_modules/*'
+                            aws s3 cp /tmp/context.zip s3://${CONTEXT_BUCKET}/${contextKey}
+                        """
 
-                                CHROME_PATH=\$CHROME npx lhci autorun --config=.lighthouserc.mobile.js
-                                MOB_EXIT=\$?
-                                REPORT_DIR=/app/lighthouse-report-mobile REPORT_LABEL="Lighthouse Mobile" PERF_MIN_SCORE=0.5 node scripts/generate-lighthouse-report.js 2>/dev/null || true
+                        def buildId = sh(
+                            script: """
+                                aws codebuild start-build \
+                                    --project-name ${CODEBUILD_PROJECT} \
+                                    --source-type-override S3 \
+                                    --source-location-override ${CONTEXT_BUCKET}/${contextKey} \
+                                    --environment-variables-override name=BASE_URL,value=${BASE_URL},type=PLAINTEXT name=RUN_LIGHTHOUSE,value=${runLighthouse},type=PLAINTEXT \
+                                    --query 'build.id' --output text
+                            """,
+                            returnStdout: true
+                        ).trim()
+                        echo "Started CodeBuild run: ${buildId}"
 
-                                if [ \$DESK_EXIT -ne 0 ] || [ \$MOB_EXIT -ne 0 ]; then exit 1; else exit 0; fi
-                            '
-                    """
-                }
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'lighthouse-report/**, lighthouse-report-mobile/**', allowEmptyArchive: true
+                        def status = 'IN_PROGRESS'
+                        while (status == 'IN_PROGRESS') {
+                            sleep(time: 15, unit: 'SECONDS')
+                            status = sh(
+                                script: "aws codebuild batch-get-builds --ids ${buildId} --query 'builds[0].buildStatus' --output text",
+                                returnStdout: true
+                            ).trim()
+                            echo "CodeBuild ${buildId}: ${status}"
+                        }
+
+                        // Pull test-results/playwright-report/lighthouse-report* back
+                        // from the CodeBuild artifact regardless of pass/fail, so the
+                        // post-build Slack/junit steps below have real data to read.
+                        def artifactLocation = sh(
+                            script: "aws codebuild batch-get-builds --ids ${buildId} --query 'builds[0].artifacts.location' --output text",
+                            returnStdout: true
+                        ).trim()
+
+                        if (artifactLocation && artifactLocation != 'None') {
+                            sh """
+                                aws s3 cp s3://${artifactLocation} /tmp/artifacts.zip
+                                unzip -o -q /tmp/artifacts.zip -d .
+                            """
+                        }
+
+                        if (status != 'SUCCEEDED') {
+                            error("CodeBuild run ${buildId} finished with status ${status}")
+                        }
+                    }
                 }
             }
         }
@@ -118,18 +120,17 @@ pipeline {
     post {
         always {
             junit allowEmptyResults: true, testResults: 'test-results/junit.xml'
-            archiveArtifacts artifacts: 'playwright-report/**', allowEmptyArchive: true
-            sh "docker rmi ${IMAGE_NAME} || true"
+            archiveArtifacts artifacts: 'playwright-report/**, lighthouse-report/**, lighthouse-report-mobile/**', allowEmptyArchive: true
 
             script {
                 try {
                     def duration    = currentBuild.durationString.replace(' and counting', '')
                     def branch      = env.GIT_BRANCH ?: 'main'
                     // Overall pipeline result — independent of what junit.xml says.
-                    // A stage before "Run tests" (e.g. Docker build) can fail and skip
-                    // Playwright entirely; junit.xml is now wiped at Checkout, so a
-                    // build that never ran tests reports 0/0 rather than reusing a
-                    // prior build's passing results.
+                    // The CodeBuild run itself can fail to even start (bad AWS creds,
+                    // missing project, S3 upload failure) before Playwright ever runs;
+                    // junit.xml is wiped at Checkout, so a build that never ran tests
+                    // reports 0/0 rather than reusing a prior build's passing results.
                     def buildResult = currentBuild.currentResult ?: 'SUCCESS'
                     def pwUrl     = "${env.BUILD_URL}artifact/playwright-report/dashboard.png"
                     def lhDeskUrl = "${env.BUILD_URL}artifact/lighthouse-report/summary.png"

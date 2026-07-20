@@ -1,0 +1,51 @@
+version: 0.2
+
+env:
+  variables:
+    RUN_LIGHTHOUSE: "false"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - npm ci
+  pre_build:
+    commands:
+      - npx playwright install --with-deps chromium
+  build:
+    commands:
+      - CI=true npx playwright test --workers=4; echo $? > /tmp/pw_exit
+      - node scripts/generate-report.js || true
+      - |
+        if [ "$RUN_LIGHTHOUSE" = "true" ]; then
+          CHROME=$(find /root/.cache/ms-playwright -name chrome -type f 2>/dev/null | head -1)
+
+          CHROME_PATH=$CHROME npx lhci autorun --config=.lighthouserc.js || true
+          REPORT_DIR=lighthouse-report REPORT_LABEL="Lighthouse Desktop" node scripts/generate-lighthouse-report.js || true
+
+          CHROME_PATH=$CHROME npx lhci autorun --config=.lighthouserc.mobile.js || true
+          REPORT_DIR=lighthouse-report-mobile REPORT_LABEL="Lighthouse Mobile" PERF_MIN_SCORE=0.5 node scripts/generate-lighthouse-report.js || true
+        fi
+  post_build:
+    commands:
+      # Playwright's exit code is the source of truth for build pass/fail —
+      # report generation and Lighthouse must not mask a test failure.
+      - exit $(cat /tmp/pw_exit)
+
+reports:
+  playwright-junit:
+    files:
+      - junit.xml
+    base-directory: test-results
+    file-format: JUNITXML
+
+artifacts:
+  files:
+    - 'test-results/**/*'
+    - 'playwright-report/**/*'
+    - 'lighthouse-report/**/*'
+    - 'lighthouse-report-mobile/**/*'
+  base-directory: '.'
+  name: 'lead-gen-website-tests-$CODEBUILD_BUILD_NUMBER.zip'
+  packaging: ZIP

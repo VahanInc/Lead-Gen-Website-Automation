@@ -1,0 +1,61 @@
+version: 0.2
+
+# =============================================================================
+# Lead-Gen-Website-Automation — Playwright + Lighthouse test runner (CodeBuild)
+# =============================================================================
+# Why CodeBuild: Jenkins now runs on Fargate agents with NO docker daemon, so the
+# old flow (docker build the test image, then `docker run` it with volume mounts to
+# collect reports) can't execute there. Instead Jenkins zips the checkout to S3,
+# starts this project, then pulls the reports below from the S3 artifacts and does
+# junit()/archiveArtifacts()/Slack exactly as before.
+#
+# Env injected by Jenkins (--environment-variables-override):
+#   BASE_URL        site under test (was credentials('LEAD_GEN_BASE_URL'))
+#   RUN_LIGHTHOUSE  "true"/"false" — Jenkins decides (Mondays on cron, always manual)
+#
+# The repo's Playwright/Lighthouse configs write to /app/... (the old container
+# WORKDIR). CodeBuild has no /app, so we symlink /app -> the source dir; every
+# hardcoded /app/lighthouse-report* path then lands inside the collected artifacts.
+
+env:
+  variables:
+    CI: "true"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - ln -sfn "$CODEBUILD_SRC_DIR" /app          # satisfy hardcoded /app/... paths
+      - npm ci
+      - npx playwright install --with-deps chromium
+  build:
+    commands:
+      # Playwright — capture the exit code instead of failing the phase, so artifacts
+      # always upload and Jenkins decides pass/fail from junit.xml + the *_exit files.
+      - npx playwright test --workers=4; echo "$?" > pw_exit.txt
+      - node scripts/generate-report.js 2>/dev/null || true
+      # Lighthouse (desktop + mobile), gated by RUN_LIGHTHOUSE. Chromium comes from
+      # the playwright browser cache; same CHROME_PATH trick as the old Jenkinsfile.
+      - |
+        if [ "${RUN_LIGHTHOUSE:-true}" = "true" ]; then
+          CHROME=$(find /root/.cache/ms-playwright -name chrome -type f 2>/dev/null | head -1)
+          CHROME_PATH="$CHROME" npx lhci autorun --config=.lighthouserc.js; echo "$?" > lh_desk_exit.txt
+          REPORT_DIR=/app/lighthouse-report REPORT_LABEL="Lighthouse Desktop" \
+            node scripts/generate-lighthouse-report.js 2>/dev/null || true
+          CHROME_PATH="$CHROME" npx lhci autorun --config=.lighthouserc.mobile.js; echo "$?" > lh_mob_exit.txt
+          REPORT_DIR=/app/lighthouse-report-mobile REPORT_LABEL="Lighthouse Mobile" PERF_MIN_SCORE=0.5 \
+            node scripts/generate-lighthouse-report.js 2>/dev/null || true
+        else
+          echo "Lighthouse skipped (RUN_LIGHTHOUSE=$RUN_LIGHTHOUSE)"
+        fi
+
+artifacts:
+  files:
+    - 'test-results/**/*'
+    - 'playwright-report/**/*'
+    - 'lighthouse-report/**/*'
+    - 'lighthouse-report-mobile/**/*'
+    - 'pw_exit.txt'
+    - 'lh_desk_exit.txt'
+    - 'lh_mob_exit.txt'

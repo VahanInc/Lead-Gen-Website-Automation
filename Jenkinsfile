@@ -1,115 +1,103 @@
 pipeline {
-    agent any
+    // Fargate 'default' pod template (has aws-cli, zip, git). No docker daemon —
+    // the build + Playwright + Lighthouse run on CodeBuild (project 'lead-gen-tests');
+    // this agent only zips the context, triggers the build, and pulls reports back.
+    agent { label 'default' }
 
     environment {
-        IMAGE_NAME    = "lead-gen-tests:${env.BUILD_NUMBER}"
-        BASE_URL      = credentials('LEAD_GEN_BASE_URL')
-        SLACK_WEBHOOK = credentials('SLACK_WEBHOOK_URL')
+        AWS_REGION       = 'ap-south-1'
+        CODEBUILD_PROJECT = 'lead-gen-tests'
+        CONTEXT_BUCKET   = 'vahan-jenkins-build-context'
+        ARTIFACT_PREFIX  = 'lead-gen-artifacts'
+        BASE_URL         = credentials('LEAD_GEN_BASE_URL')
+        SLACK_WEBHOOK    = credentials('SLACK_WEBHOOK_URL')
     }
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '1'))
-        timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 40, unit: 'MINUTES')
         disableConcurrentBuilds()
     }
 
     triggers {
-        cron('H 5 * * *')   // Playwright runs daily 10:00–10:59
+        cron('H 5 * * *')   // Playwright runs daily 10:00–10:59 IST
     }
 
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
-                // Prevent stale results from a prior run being mistaken for this
-                // build's result when a later stage fails or is skipped (e.g. the
-                // Docker build stage failing before Playwright ever runs must not
-                // leave a passing junit.xml from the last successful build behind).
-                // These files are written by root inside the containers, so they
-                // must also be removed as root via a throwaway container rather
-                // than a plain host-side rm (which gets Permission denied).
-                sh 'docker run --rm -v $WORKSPACE:/workspace alpine rm -rf /workspace/lighthouse-report /workspace/lighthouse-report-mobile /workspace/test-results /workspace/playwright-report'
+                // Wipe any stale reports from a prior run so a failed build can't be
+                // scored against last run's results. These are plain agent-side files
+                // now (no root-owned docker outputs), so a host rm is enough.
+                sh 'rm -rf lighthouse-report lighthouse-report-mobile test-results playwright-report pw_exit.txt lh_desk_exit.txt lh_mob_exit.txt'
             }
         }
 
-        stage('Free disk space') {
+        stage('Build + Test on CodeBuild') {
             steps {
-                // Dangling layers and stray images from this project accumulate across
-                // daily builds and can eventually fill the host disk, failing the image
-                // build outright (e.g. ENOSPC while downloading the Chromium binary).
-                // This host may run other Jenkins jobs, so we deliberately avoid
-                // `docker system prune -a` / `--volumes` here — those are daemon-wide
-                // and would delete other jobs' unused images and volumes too. Instead:
-                //   1) remove this project's own leftover lead-gen-tests:* image tags
-                //      (in case a prior run's cleanup step didn't get to run)
-                //   2) remove genuinely dangling (untagged, unreferenced-by-anything)
-                //      image layers — these aren't any other job's tagged image
-                sh '''
-                    docker images "lead-gen-tests" -q | xargs -r docker rmi -f || true
-                    docker image prune -f || true
-                '''
-            }
-        }
-
-        stage('Build image') {
-            steps {
-                sh "docker build -t ${IMAGE_NAME} ."
-            }
-        }
-
-        stage('Run tests') {
-            steps {
-                catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                    sh """
-                        docker run --rm \
-                            -e CI=true \
-                            -e BASE_URL=${BASE_URL} \
-                            -v ${WORKSPACE}/playwright-report:/app/playwright-report \
-                            -v ${WORKSPACE}/test-results:/app/test-results \
-                            ${IMAGE_NAME} \
-                            sh -c 'npx playwright test --workers=4; PW_EXIT=\$?; node scripts/generate-report.js 2>/dev/null || true; exit \$PW_EXIT'
-                    """
-                }
-            }
-        }
-
-        stage('Lighthouse') {
-            when {
-                expression {
-                    // Cron builds: run only on Mondays (IST). Manual builds: always run.
+                script {
+                    // Lighthouse gating (was the stage `when`): cron builds run it only
+                    // on Mondays (IST); manual builds always run it.
                     def isTimer = currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').size() > 0
                     def cal = Calendar.getInstance(TimeZone.getTimeZone('Asia/Kolkata'))
-                    return !isTimer || cal.get(Calendar.DAY_OF_WEEK) == Calendar.MONDAY
-                }
-            }
-            steps {
-                catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                    sh """
-                        docker run --rm \
-                            -e CI=true \
-                            -e BASE_URL=${BASE_URL} \
-                            -v ${WORKSPACE}/lighthouse-report:/app/lighthouse-report \
-                            -v ${WORKSPACE}/lighthouse-report-mobile:/app/lighthouse-report-mobile \
-                            ${IMAGE_NAME} \
-                            sh -c '
-                                CHROME=\$(find /root/.cache/ms-playwright -name chrome -type f 2>/dev/null | head -1)
+                    env.RUN_LIGHTHOUSE = (!isTimer || cal.get(Calendar.DAY_OF_WEEK) == Calendar.MONDAY).toString()
 
-                                CHROME_PATH=\$CHROME npx lhci autorun --config=.lighthouserc.js
-                                DESK_EXIT=\$?
-                                REPORT_DIR=/app/lighthouse-report REPORT_LABEL="Lighthouse Desktop" node scripts/generate-lighthouse-report.js 2>/dev/null || true
+                    // Zip the checkout to S3, start the CodeBuild project, poll it, then
+                    // sync the reports back into the workspace. No withCredentials for AWS:
+                    // the Fargate agent authenticates via IRSA (StartBuild + S3).
+                    sh '''#!/bin/bash
+                        set -euo pipefail
+                        # ~/.aws is mounted read-only; give the AWS CLI a writable HOME for its cache.
+                        export HOME="$(mktemp -d)"
 
-                                CHROME_PATH=\$CHROME npx lhci autorun --config=.lighthouserc.mobile.js
-                                MOB_EXIT=\$?
-                                REPORT_DIR=/app/lighthouse-report-mobile REPORT_LABEL="Lighthouse Mobile" PERF_MIN_SCORE=0.5 node scripts/generate-lighthouse-report.js 2>/dev/null || true
+                        job="${JOB_NAME:-manual}"; job="${job//[ \\/]/_}"
+                        KEY="contexts/${job}-${BUILD_NUMBER}-$(date +%s).zip"
 
-                                if [ \$DESK_EXIT -ne 0 ] || [ \$MOB_EXIT -ne 0 ]; then exit 1; else exit 0; fi
-                            '
-                    """
-                }
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'lighthouse-report/**, lighthouse-report-mobile/**', allowEmptyArchive: true
+                        echo ">> zipping context -> s3://${CONTEXT_BUCKET}/${KEY}"
+                        tmp="$(mktemp -d)"
+                        zip -rq "$tmp/ctx.zip" . -x '.git/*' 'node_modules/*'
+                        aws s3 cp "$tmp/ctx.zip" "s3://${CONTEXT_BUCKET}/${KEY}" --region "${AWS_REGION}" --only-show-errors
+
+                        echo ">> starting CodeBuild ${CODEBUILD_PROJECT} (RUN_LIGHTHOUSE=${RUN_LIGHTHOUSE})"
+                        BID="$(aws codebuild start-build \
+                          --project-name "${CODEBUILD_PROJECT}" --region "${AWS_REGION}" \
+                          --source-location-override "${CONTEXT_BUCKET}/${KEY}" --source-type-override S3 \
+                          --environment-variables-override \
+                              "name=BASE_URL,value=${BASE_URL},type=PLAINTEXT" \
+                              "name=RUN_LIGHTHOUSE,value=${RUN_LIGHTHOUSE},type=PLAINTEXT" \
+                          --artifacts-override "type=S3,location=${CONTEXT_BUCKET},path=${ARTIFACT_PREFIX},namespaceType=NONE,name=${BUILD_NUMBER},packaging=NONE" \
+                          --query 'build.id' --output text)"
+                        echo ">> build id: ${BID}"
+
+                        status=IN_PROGRESS
+                        while [ "$status" = "IN_PROGRESS" ]; do
+                          sleep 10
+                          status="$(aws codebuild batch-get-builds --ids "$BID" --region "${AWS_REGION}" --query 'builds[0].buildStatus' --output text)"
+                          echo "   ... $status"
+                        done
+
+                        echo ">> pulling reports s3://${CONTEXT_BUCKET}/${ARTIFACT_PREFIX}/${BUILD_NUMBER}/ -> workspace"
+                        aws s3 sync "s3://${CONTEXT_BUCKET}/${ARTIFACT_PREFIX}/${BUILD_NUMBER}/" . --region "${AWS_REGION}" --only-show-errors || true
+
+                        if [ "$status" != "SUCCEEDED" ]; then
+                          echo "!! CodeBuild ${BID} finished: ${status} (infra failure — tests did not complete)"
+                          echo "   logs: https://${AWS_REGION}.console.aws.amazon.com/codesuite/codebuild/projects/${CODEBUILD_PROJECT}/build/${BID//:/%3A}"
+                          exit 1
+                        fi
+                        echo ">> CodeBuild SUCCEEDED — reports pulled"
+                    '''
+
+                    // Translate the captured exit codes into the Jenkins build result,
+                    // mirroring the old catchError(FAILURE) on the test + lighthouse stages.
+                    def rd = { f -> fileExists(f) ? (readFile(f).trim() ?: '1') : '0' }
+                    def pw  = fileExists('pw_exit.txt') ? (readFile('pw_exit.txt').trim() ?: '1') : '1'
+                    def lhd = rd('lh_desk_exit.txt')
+                    def lhm = rd('lh_mob_exit.txt')
+                    if (pw != '0' || lhd != '0' || lhm != '0') {
+                        currentBuild.result = 'FAILURE'
+                        echo "Marking build FAILURE (playwright=${pw}, lighthouse-desktop=${lhd}, lighthouse-mobile=${lhm})"
+                    }
                 }
             }
         }
@@ -118,18 +106,16 @@ pipeline {
     post {
         always {
             junit allowEmptyResults: true, testResults: 'test-results/junit.xml'
-            archiveArtifacts artifacts: 'playwright-report/**', allowEmptyArchive: true
-            sh "docker rmi ${IMAGE_NAME} || true"
+            archiveArtifacts artifacts: 'playwright-report/**, lighthouse-report/**, lighthouse-report-mobile/**', allowEmptyArchive: true
 
             script {
                 try {
                     def duration    = currentBuild.durationString.replace(' and counting', '')
                     def branch      = env.GIT_BRANCH ?: 'main'
                     // Overall pipeline result — independent of what junit.xml says.
-                    // A stage before "Run tests" (e.g. Docker build) can fail and skip
-                    // Playwright entirely; junit.xml is now wiped at Checkout, so a
-                    // build that never ran tests reports 0/0 rather than reusing a
-                    // prior build's passing results.
+                    // A stage before tests (e.g. the CodeBuild infra failure) can leave
+                    // no junit.xml; it's wiped at Checkout, so a build that never ran
+                    // tests reports 0/0 rather than reusing a prior build's results.
                     def buildResult = currentBuild.currentResult ?: 'SUCCESS'
                     def pwUrl     = "${env.BUILD_URL}artifact/playwright-report/dashboard.png"
                     def lhDeskUrl = "${env.BUILD_URL}artifact/lighthouse-report/summary.png"
@@ -192,10 +178,10 @@ print('\\\\n'.join(names[:10]))
                     def consoleUrl = "${env.BUILD_URL}console"
 
                     if (pwTotalInt == 0 && buildResult != 'SUCCESS') {
-                        // No tests ran at all (e.g. Docker build/image stage failed
-                        // before Playwright started) — never report this as a pass.
+                        // No tests ran at all (e.g. the CodeBuild build failed before
+                        // Playwright started) — never report this as a pass.
                         text = ":red_circle: *Lead Gen Tests DID NOT RUN* — Build #${env.BUILD_NUMBER} (${branch})\n" +
-                               "Pipeline failed before Playwright tests could execute (result: ${buildResult}). Likely a Docker build or infra issue.\n" +
+                               "Pipeline failed before Playwright tests could execute (result: ${buildResult}). Likely a CodeBuild or infra issue.\n" +
                                "<${consoleUrl}|Console Output>"
 
                     } else if (pwFailedInt == 0 && !lhFailed && buildResult == 'SUCCESS') {

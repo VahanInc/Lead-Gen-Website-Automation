@@ -99,7 +99,7 @@ pipeline {
                         def artifactLocation = sh(
                             script: "aws codebuild batch-get-builds --ids ${buildId} --query 'builds[0].artifacts.location' --output text",
                             returnStdout: true
-                        ).trim()
+                        ).trim().replaceFirst(/^arn:aws:s3:::/, '')   // location is an S3 ARN; s3 cp needs bucket/key
 
                         if (artifactLocation && artifactLocation != 'None') {
                             sh """

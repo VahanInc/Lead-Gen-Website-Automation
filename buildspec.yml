@@ -1,8 +1,11 @@
 version: 0.2
 
-env:
-  variables:
-    RUN_LIGHTHOUSE: "false"
+# RUN_LIGHTHOUSE is NOT declared here on purpose: CodeBuild gives buildspec-level
+# `env.variables` precedence over `environmentVariablesOverride` passed at
+# start-build, so hardcoding it here would silently clobber whatever Jenkins
+# computes for the Monday gate (it always did, forcing RUN_LIGHTHOUSE=false
+# regardless of what start-build passed). Jenkins's override is now the only
+# source of truth; the `if` below simply treats an unset var as not-"true".
 
 phases:
   install:

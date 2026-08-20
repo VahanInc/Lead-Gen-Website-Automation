@@ -58,6 +58,11 @@ pipeline {
                         def isTimer = currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').size() > 0
                         def cal = Calendar.getInstance(TimeZone.getTimeZone('Asia/Kolkata'))
                         def runLighthouse = (!isTimer || cal.get(Calendar.DAY_OF_WEEK) == Calendar.MONDAY) as String
+                        // Persisted so the post{} block can tell "genuinely not scheduled
+                        // today" apart from "was scheduled but produced no report" (e.g. the
+                        // RUN_LIGHTHOUSE-clobbered-by-buildspec bug) instead of inferring it
+                        // from whether lhci-issues.txt happens to exist.
+                        env.RUN_LIGHTHOUSE = runLighthouse
 
                         def safeJobName = env.JOB_NAME.replaceAll('[^A-Za-z0-9._-]', '_')
                         def contextKey  = "contexts/${safeJobName}-${env.BUILD_NUMBER}.zip"
@@ -149,9 +154,14 @@ pipeline {
                     def pwTotalInt  = pwTotal.isInteger()  ? pwTotal.toInteger()  : 0
 
                     // ── Lighthouse result (desktop + mobile) ──────────────────
-                    // 'SKIPPED' when the stage was skipped (non-Monday cron build)
-                    def lhDeskRaw    = sh(script: "cat lighthouse-report/lhci-issues.txt 2>/dev/null || echo 'SKIPPED'", returnStdout: true).trim()
-                    def lhMobRaw     = sh(script: "cat lighthouse-report-mobile/lhci-issues.txt 2>/dev/null || echo 'SKIPPED'", returnStdout: true).trim()
+                    // 'MISSING' (not 'SKIPPED') when the report file isn't there — Jenkins'
+                    // own RUN_LIGHTHOUSE decision (env var, set from the Monday gate above)
+                    // is the only reliable source of "genuinely not scheduled today". Falling
+                    // back to file-presence to infer that meant a CodeBuild-side failure to
+                    // produce the report (e.g. buildspec's own env.variables clobbering the
+                    // start-build override) was silently reported as a scheduled skip.
+                    def lhDeskRaw    = sh(script: "cat lighthouse-report/lhci-issues.txt 2>/dev/null || echo 'MISSING'", returnStdout: true).trim()
+                    def lhMobRaw     = sh(script: "cat lighthouse-report-mobile/lhci-issues.txt 2>/dev/null || echo 'MISSING'", returnStdout: true).trim()
 
                     def lhDeskLines  = lhDeskRaw.split('\n') as List
                     def lhDeskStatus = lhDeskLines[0].trim()
@@ -163,14 +173,20 @@ pipeline {
                     def lhMobIssues  = lhMobLines.size() > 1 ? lhMobLines[1..-1].join('\n') : ''
                     def lhMobFailed  = lhMobStatus == 'FAIL'
 
-                    def lhFailed  = lhDeskFailed || lhMobFailed
-                    def lhSkipped = lhDeskStatus == 'SKIPPED' && lhMobStatus == 'SKIPPED'
+                    def lhScheduled = env.RUN_LIGHTHOUSE == 'true'
+                    def lhSkipped   = !lhScheduled
+                    // Scheduled to run, but no report came back — a real failure, not a skip.
+                    def lhMissing   = lhScheduled && (lhDeskStatus == 'MISSING' || lhMobStatus == 'MISSING')
+                    def lhFailed    = lhDeskFailed || lhMobFailed || lhMissing
 
                     def lhFooter  = lhSkipped
                         ? "_Lighthouse not scheduled today — runs every Monday_"
-                        : "<${lhDeskUrl}|Desktop Report>  |  <${lhMobUrl}|Mobile Report>"
+                        : lhMissing
+                            ? "_:warning: Lighthouse ran but no report came back — check CodeBuild logs_"
+                            : "<${lhDeskUrl}|Desktop Report>  |  <${lhMobUrl}|Mobile Report>"
 
                     def lhBlock = ''
+                    if (lhMissing) lhBlock += "\n*⚠️ Lighthouse:* Scheduled to run (RUN_LIGHTHOUSE=true) but produced no report — check the CodeBuild build logs."
                     if (lhDeskFailed && lhDeskIssues) lhBlock += "\n*🖥 Desktop Issues:*\n${lhDeskIssues}"
                     if (lhMobFailed  && lhMobIssues)  lhBlock += "\n*📱 Mobile Issues:*\n${lhMobIssues}"
 

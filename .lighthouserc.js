@@ -25,7 +25,7 @@ module.exports = {
     },
     upload: {
       target: 'filesystem',
-      outputDir: '/app/lighthouse-report',
+      outputDir: 'lighthouse-report',
       reportFilenamePattern: '%%PATHNAME%%-%%DATETIME%%-report.%%EXTENSION%%',
     },
   },

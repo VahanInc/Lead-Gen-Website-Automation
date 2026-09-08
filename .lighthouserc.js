@@ -12,7 +12,10 @@ module.exports = {
       settings: {
         chromeFlags: '--no-sandbox --headless --disable-gpu --disable-dev-shm-usage',
         preset: 'desktop',
-        throttlingMethod: 'provided',
+        // 'provided' reports raw observed timings with no throttling simulation,
+        // so the score directly reflects however fast/contended the CI host is —
+        // 'simulate' normalizes via Lantern so scores stay comparable across hosts.
+        throttlingMethod: 'simulate',
       },
     },
     assert: {

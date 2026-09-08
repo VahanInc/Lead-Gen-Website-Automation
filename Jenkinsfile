@@ -32,6 +32,10 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '1'))
         timeout(time: 30, unit: 'MINUTES')
         disableConcurrentBuilds()
+        // Declarative Pipeline auto-checks-out SCM before any stages run whenever
+        // `agent` is set top-level; the 'Checkout' stage below does its own
+        // `checkout scm` too, so without this every build cloned the repo twice.
+        skipDefaultCheckout()
     }
 
     triggers {

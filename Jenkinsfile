@@ -53,68 +53,82 @@ pipeline {
         stage('Run tests on CodeBuild') {
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                    script {
-                        // Cron builds: run Lighthouse only on Mondays (IST). Manual builds: always run.
-                        def isTimer = currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').size() > 0
-                        def cal = Calendar.getInstance(TimeZone.getTimeZone('Asia/Kolkata'))
-                        def runLighthouse = (!isTimer || cal.get(Calendar.DAY_OF_WEEK) == Calendar.MONDAY) as String
-                        // Persisted so the post{} block can tell "genuinely not scheduled
-                        // today" apart from "was scheduled but produced no report" (e.g. the
-                        // RUN_LIGHTHOUSE-clobbered-by-buildspec bug) instead of inferring it
-                        // from whether lhci-issues.txt happens to exist.
-                        env.RUN_LIGHTHOUSE = runLighthouse
+                    // The 'default' pod template currently mounts /home/jenkins/.aws
+                    // straight from the jenkins-agent-aws Secret (read-only — Secret
+                    // volumes can't be writable), which breaks the AWS CLI's own
+                    // ~/.aws/cli/cache dir creation: "Read-only file system:
+                    // '/home/jenkins/.aws/cli'". Point $HOME at a writable workspace
+                    // dir for that cache, while still reading real creds from the
+                    // read-only mount explicitly via AWS_*_FILE.
+                    withEnv([
+                        "HOME=${env.WORKSPACE}/.aws-home",
+                        'AWS_SHARED_CREDENTIALS_FILE=/home/jenkins/.aws/credentials',
+                        'AWS_CONFIG_FILE=/home/jenkins/.aws/config',
+                    ]) {
+                        script {
+                            // Cron builds: run Lighthouse only on Mondays (IST). Manual builds: always run.
+                            def isTimer = currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').size() > 0
+                            def cal = Calendar.getInstance(TimeZone.getTimeZone('Asia/Kolkata'))
+                            def runLighthouse = (!isTimer || cal.get(Calendar.DAY_OF_WEEK) == Calendar.MONDAY) as String
+                            // Persisted so the post{} block can tell "genuinely not scheduled
+                            // today" apart from "was scheduled but produced no report" (e.g. the
+                            // RUN_LIGHTHOUSE-clobbered-by-buildspec bug) instead of inferring it
+                            // from whether lhci-issues.txt happens to exist.
+                            env.RUN_LIGHTHOUSE = runLighthouse
 
-                        def safeJobName = env.JOB_NAME.replaceAll('[^A-Za-z0-9._-]', '_')
-                        def contextKey  = "contexts/${safeJobName}-${env.BUILD_NUMBER}.zip"
+                            def safeJobName = env.JOB_NAME.replaceAll('[^A-Za-z0-9._-]', '_')
+                            def contextKey  = "contexts/${safeJobName}-${env.BUILD_NUMBER}.zip"
 
-                        // Ship the repo to S3 as CodeBuild's build context — this
-                        // agent has no Docker, so the actual build/test run happens
-                        // entirely inside CodeBuild (see buildspec.yml at repo root).
-                        sh """
-                            zip -r -q /tmp/context.zip . -x '.git/*' -x 'node_modules/*'
-                            aws s3 cp /tmp/context.zip s3://${CONTEXT_BUCKET}/${contextKey}
-                        """
+                            // Ship the repo to S3 as CodeBuild's build context — this
+                            // agent has no Docker, so the actual build/test run happens
+                            // entirely inside CodeBuild (see buildspec.yml at repo root).
+                            sh """
+                                mkdir -p "\$HOME"
+                                zip -r -q /tmp/context.zip . -x '.git/*' -x 'node_modules/*'
+                                aws s3 cp /tmp/context.zip s3://${CONTEXT_BUCKET}/${contextKey}
+                            """
 
-                        def buildId = sh(
-                            script: """
-                                aws codebuild start-build \
-                                    --project-name ${CODEBUILD_PROJECT} \
-                                    --source-type-override S3 \
-                                    --source-location-override ${CONTEXT_BUCKET}/${contextKey} \
-                                    --environment-variables-override name=BASE_URL,value=${BASE_URL},type=PLAINTEXT name=RUN_LIGHTHOUSE,value=${runLighthouse},type=PLAINTEXT \
-                                    --query 'build.id' --output text
-                            """,
-                            returnStdout: true
-                        ).trim()
-                        echo "Started CodeBuild run: ${buildId}"
-
-                        def status = 'IN_PROGRESS'
-                        while (status == 'IN_PROGRESS') {
-                            sleep(time: 15, unit: 'SECONDS')
-                            status = sh(
-                                script: "aws codebuild batch-get-builds --ids ${buildId} --query 'builds[0].buildStatus' --output text",
+                            def buildId = sh(
+                                script: """
+                                    aws codebuild start-build \
+                                        --project-name ${CODEBUILD_PROJECT} \
+                                        --source-type-override S3 \
+                                        --source-location-override ${CONTEXT_BUCKET}/${contextKey} \
+                                        --environment-variables-override name=BASE_URL,value=${BASE_URL},type=PLAINTEXT name=RUN_LIGHTHOUSE,value=${runLighthouse},type=PLAINTEXT \
+                                        --query 'build.id' --output text
+                                """,
                                 returnStdout: true
                             ).trim()
-                            echo "CodeBuild ${buildId}: ${status}"
-                        }
+                            echo "Started CodeBuild run: ${buildId}"
 
-                        // Pull test-results/playwright-report/lighthouse-report* back
-                        // from the CodeBuild artifact regardless of pass/fail, so the
-                        // post-build Slack/junit steps below have real data to read.
-                        def artifactLocation = sh(
-                            script: "aws codebuild batch-get-builds --ids ${buildId} --query 'builds[0].artifacts.location' --output text",
-                            returnStdout: true
-                        ).trim().replaceFirst(/^arn:aws:s3:::/, '')   // location is an S3 ARN; s3 cp needs bucket/key
+                            def status = 'IN_PROGRESS'
+                            while (status == 'IN_PROGRESS') {
+                                sleep(time: 15, unit: 'SECONDS')
+                                status = sh(
+                                    script: "aws codebuild batch-get-builds --ids ${buildId} --query 'builds[0].buildStatus' --output text",
+                                    returnStdout: true
+                                ).trim()
+                                echo "CodeBuild ${buildId}: ${status}"
+                            }
 
-                        if (artifactLocation && artifactLocation != 'None') {
-                            sh """
-                                aws s3 cp s3://${artifactLocation} /tmp/artifacts.zip
-                                unzip -o -q /tmp/artifacts.zip -d .
-                            """
-                        }
+                            // Pull test-results/playwright-report/lighthouse-report* back
+                            // from the CodeBuild artifact regardless of pass/fail, so the
+                            // post-build Slack/junit steps below have real data to read.
+                            def artifactLocation = sh(
+                                script: "aws codebuild batch-get-builds --ids ${buildId} --query 'builds[0].artifacts.location' --output text",
+                                returnStdout: true
+                            ).trim().replaceFirst(/^arn:aws:s3:::/, '')   // location is an S3 ARN; s3 cp needs bucket/key
 
-                        if (status != 'SUCCEEDED') {
-                            error("CodeBuild run ${buildId} finished with status ${status}")
+                            if (artifactLocation && artifactLocation != 'None') {
+                                sh """
+                                    aws s3 cp s3://${artifactLocation} /tmp/artifacts.zip
+                                    unzip -o -q /tmp/artifacts.zip -d .
+                                """
+                            }
+
+                            if (status != 'SUCCEEDED') {
+                                error("CodeBuild run ${buildId} finished with status ${status}")
+                            }
                         }
                     }
                 }

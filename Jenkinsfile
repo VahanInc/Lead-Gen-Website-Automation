@@ -99,6 +99,7 @@ pipeline {
                                         --source-type-override S3 \
                                         --source-location-override ${CONTEXT_BUCKET}/${contextKey} \
                                         --environment-variables-override name=BASE_URL,value=${BASE_URL},type=PLAINTEXT name=RUN_LIGHTHOUSE,value=${runLighthouse},type=PLAINTEXT \
+                                        --compute-type-override BUILD_GENERAL1_MEDIUM \
                                         --query 'build.id' --output text
                                 """,
                                 returnStdout: true

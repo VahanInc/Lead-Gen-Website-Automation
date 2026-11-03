@@ -4,7 +4,7 @@ pipeline {
     environment {
         BASE_URL      = credentials('LEAD_GEN_BASE_URL')
         SLACK_WEBHOOK = credentials('SLACK_WEBHOOK_URL')
-        TUSKR_API_TOKEN = credentials('tuskr-api-token')   
+        TUSKR_API_TOKEN = 'lT5PkyDdxgsjHFIh3L3pjPDsQ8H5wks7pQHLXKSh'   
         // The K8s Jenkins agent pod (template "default") has no Docker — see the
         // ENOSPC/"docker: not found" incidents on this job. Tests now run on AWS
         // CodeBuild instead, following the same pattern the "Lead Generation

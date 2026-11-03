@@ -25,11 +25,12 @@ phases:
       # The CLI echoes its options (token included), hence the sed redaction.
       - |
         if [ -n "$TUSKR_API_TOKEN" ] && [ -f results.xml ]; then
+          node scripts/prepare-tuskr.js
           npx -y tuskr \
             --project="PWVAHAN" \
             --test-run-name="[AUTO] Regression #${JENKINS_BUILD_NUMBER}" \
             --api-token="$TUSKR_API_TOKEN" \
-            --file="results.xml" \
+            --file="results-tuskr.xml" \
             --test-case-rules="rules/tuskr-rules.json" 2>&1 \
             | sed "s/$TUSKR_API_TOKEN/****/g" || echo "Tuskr upload failed"
         fi

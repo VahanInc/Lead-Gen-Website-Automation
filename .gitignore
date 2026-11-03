@@ -6,3 +6,5 @@ blob-report/
 playwright/.cache/
 .claude/settings.local.json
 results.xml
+results-tuskr.xml
+results-tuskr.zip

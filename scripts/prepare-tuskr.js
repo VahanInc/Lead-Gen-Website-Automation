@@ -28,12 +28,15 @@ const TYPE_PROP = `<property name="testCase[testCaseType]" value="${CASE_TYPE}"/
 let cases = 0;
 let shots = 0;
 
+// Skipped tests already carry a <properties> block (the skip reason); Tuskr only reads
+// one block per testcase, so add the type into that block rather than a second one.
 const xml = fs.readFileSync(SRC, 'utf8')
-  .replace(/<testcase\b[^>]*?(\/?)>/g, (open, selfClosing) => {
+  .replace(/<testcase\b[^>]*?(?:\/>|>[\s\S]*?<\/testcase>)/g, (tc) => {
     cases++;
-    return selfClosing
-      ? `${open.slice(0, -2)}>\n<properties>${TYPE_PROP}</properties>\n</testcase>`
-      : `${open}\n<properties>${TYPE_PROP}</properties>`;
+    if (tc.includes('<properties>')) return tc.replace('<properties>', `<properties>\n${TYPE_PROP}`);
+    return tc.endsWith('/>')
+      ? `${tc.slice(0, -2)}>\n<properties>${TYPE_PROP}</properties>\n</testcase>`
+      : tc.replace(/^<testcase\b[^>]*>/, (open) => `${open}\n<properties>${TYPE_PROP}</properties>`);
   })
   .replace(/\[\[ATTACHMENT\|([^\]]+)\]\]/g, (_, p) => {
     const abs = path.resolve(path.dirname(SRC), p);

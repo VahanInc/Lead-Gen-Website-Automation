@@ -3,7 +3,7 @@
     "name": "{{classname}} > {{name}}",
     "testSuite": "Playwright",
     "testSuiteSection": "General",
-    "automationId": "{{name}}"
+    "automationId": "{{classname}} > {{name}}"
   },
   "name ~ login": {
     "testSuite": "Playwright",

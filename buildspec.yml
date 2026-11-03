@@ -45,6 +45,8 @@ reports:
 
 artifacts:
   files:
+    # results.xml is the JUnit file Jenkins uploads to Tuskr (see Jenkinsfile post{}).
+    - 'results.xml'
     - 'test-results/**/*'
     - 'playwright-report/**/*'
     - 'lighthouse-report/**/*'

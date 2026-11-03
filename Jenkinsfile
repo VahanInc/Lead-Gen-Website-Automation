@@ -4,6 +4,7 @@ pipeline {
     environment {
         BASE_URL      = credentials('LEAD_GEN_BASE_URL')
         SLACK_WEBHOOK = credentials('SLACK_WEBHOOK_URL')
+        TUSKR_API_TOKEN = credentials('lT5PkyDdxgsjHFIh3L3pjPDsQ8H5wks7pQHLXKSh')   
         // The K8s Jenkins agent pod (template "default") has no Docker — see the
         // ENOSPC/"docker: not found" incidents on this job. Tests now run on AWS
         // CodeBuild instead, following the same pattern the "Lead Generation
@@ -50,7 +51,7 @@ pipeline {
                 // build's result when a later stage fails or is skipped. No Docker
                 // on this agent, so these are plain host files now (no more root
                 // ownership from a container) — a normal rm is enough.
-                sh 'rm -rf lighthouse-report lighthouse-report-mobile test-results playwright-report'
+                sh 'rm -rf lighthouse-report lighthouse-report-mobile test-results playwright-report results.xml'
             }
         }
 
@@ -145,6 +146,28 @@ pipeline {
         always {
             junit allowEmptyResults: true, testResults: 'test-results/junit.xml'
             archiveArtifacts artifacts: 'playwright-report/**, lighthouse-report/**, lighthouse-report-mobile/**', allowEmptyArchive: true
+
+            // Import Playwright results into Tuskr. results.xml comes back from the
+            // CodeBuild artifact; skipped if tests never ran. Wrapped so a Tuskr
+            // outage doesn't fail the build or block the Slack message below.
+            script {
+                try {
+                    sh '''
+                        if [ -f results.xml ]; then
+                            npx -y tuskr \
+                                --project="PWVAHAN" \
+                                --test-run-name="[AUTO] Regression #${BUILD_NUMBER}" \
+                                --api-token="$TUSKR_API_TOKEN" \
+                                --file="results.xml" \
+                                --test-case-rules="rules/tuskr-rules.json"
+                        else
+                            echo "results.xml not found — skipping Tuskr upload"
+                        fi
+                    '''
+                } catch (e) {
+                    echo "Tuskr upload failed: ${e.message}"
+                }
+            }
 
             script {
                 try {

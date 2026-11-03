@@ -1,0 +1,16 @@
+{
+  "defaults": {
+    "name": "{{classname}} > {{name}}",
+    "testSuite": "Playwright",
+    "testSuiteSection": "General",
+    "automationId": "{{name}}"
+  },
+  "name ~ login": {
+    "testSuite": "Playwright",
+    "testSuiteSection": "Authentication"
+  },
+  "name ~ checkout": {
+    "testSuite": "Playwright",
+    "testSuiteSection": "Checkout"
+  }
+}

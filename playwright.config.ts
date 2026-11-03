@@ -10,7 +10,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: process.env.CI
-    ? [['html', { open: 'never' }], ['junit', { outputFile: 'test-results/junit.xml' }]]
+    ? [['html', { open: 'never' }], ['junit', { outputFile: 'test-results/junit.xml' }], ['junit', { outputFile: 'results.xml' }]]
     : 'html',
   timeout: 30_000,
   expect: {

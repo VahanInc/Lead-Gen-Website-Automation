@@ -1,5 +1,7 @@
 pipeline {
-    agent any
+    // Pin to the 'default' pod template: it has zip/aws/python3, which the stages below
+    // need. With `agent any`, build #147 landed on an 'android' pod and failed on `zip: not found`.
+    agent { label 'default' }
 
     environment {
         BASE_URL      = credentials('LEAD_GEN_BASE_URL')

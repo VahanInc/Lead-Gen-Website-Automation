@@ -22,6 +22,7 @@ phases:
       - node scripts/generate-report.js || true
       # Tuskr upload runs here, not in Jenkins — the Jenkins agent has no Node/npx.
       # TUSKR_API_TOKEN and JENKINS_BUILD_NUMBER come from the start-build override.
+      # The CLI echoes its options (token included), hence the sed redaction.
       - |
         if [ -n "$TUSKR_API_TOKEN" ] && [ -f results.xml ]; then
           npx -y tuskr \
@@ -29,7 +30,8 @@ phases:
             --test-run-name="[AUTO] Regression #${JENKINS_BUILD_NUMBER}" \
             --api-token="$TUSKR_API_TOKEN" \
             --file="results.xml" \
-            --test-case-rules="rules/tuskr-rules.json" || echo "Tuskr upload failed"
+            --test-case-rules="rules/tuskr-rules.json" 2>&1 \
+            | sed "s/$TUSKR_API_TOKEN/****/g" || echo "Tuskr upload failed"
         fi
       - |
         if [ "$RUN_LIGHTHOUSE" = "true" ]; then

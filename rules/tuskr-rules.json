@@ -3,6 +3,7 @@
     "name": "{{classname}} > {{name}}",
     "testSuite": "Playwright",
     "testSuiteSection": "General",
+    "testCaseType": "Functional",
     "automationId": "{{name}}"
   },
   "name ~ login": {

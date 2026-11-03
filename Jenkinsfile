@@ -95,11 +95,12 @@ pipeline {
 
                             def buildId = sh(
                                 script: """
+                                    set +x
                                     aws codebuild start-build \
                                         --project-name ${CODEBUILD_PROJECT} \
                                         --source-type-override S3 \
                                         --source-location-override ${CONTEXT_BUCKET}/${contextKey} \
-                                        --environment-variables-override name=BASE_URL,value=${BASE_URL},type=PLAINTEXT name=RUN_LIGHTHOUSE,value=${runLighthouse},type=PLAINTEXT \
+                                        --environment-variables-override name=BASE_URL,value=${BASE_URL},type=PLAINTEXT name=RUN_LIGHTHOUSE,value=${runLighthouse},type=PLAINTEXT name=TUSKR_API_TOKEN,value=\$TUSKR_API_TOKEN,type=PLAINTEXT name=JENKINS_BUILD_NUMBER,value=${env.BUILD_NUMBER},type=PLAINTEXT \
                                         --compute-type-override BUILD_GENERAL1_MEDIUM \
                                         --query 'build.id' --output text
                                 """,
@@ -146,28 +147,6 @@ pipeline {
         always {
             junit allowEmptyResults: true, testResults: 'test-results/junit.xml'
             archiveArtifacts artifacts: 'playwright-report/**, lighthouse-report/**, lighthouse-report-mobile/**', allowEmptyArchive: true
-
-            // Import Playwright results into Tuskr. results.xml comes back from the
-            // CodeBuild artifact; skipped if tests never ran. Wrapped so a Tuskr
-            // outage doesn't fail the build or block the Slack message below.
-            script {
-                try {
-                    sh '''
-                        if [ -f results.xml ]; then
-                            npx -y tuskr \
-                                --project="PWVAHAN" \
-                                --test-run-name="[AUTO] Regression #${BUILD_NUMBER}" \
-                                --api-token="$TUSKR_API_TOKEN" \
-                                --file="results.xml" \
-                                --test-case-rules="rules/tuskr-rules.json"
-                        else
-                            echo "results.xml not found — skipping Tuskr upload"
-                        fi
-                    '''
-                } catch (e) {
-                    echo "Tuskr upload failed: ${e.message}"
-                }
-            }
 
             script {
                 try {

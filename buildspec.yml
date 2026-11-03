@@ -20,6 +20,17 @@ phases:
     commands:
       - CI=true npx playwright test --workers=4; echo $? > /tmp/pw_exit
       - node scripts/generate-report.js || true
+      # Tuskr upload runs here, not in Jenkins — the Jenkins agent has no Node/npx.
+      # TUSKR_API_TOKEN and JENKINS_BUILD_NUMBER come from the start-build override.
+      - |
+        if [ -n "$TUSKR_API_TOKEN" ] && [ -f results.xml ]; then
+          npx -y tuskr \
+            --project="PWVAHAN" \
+            --test-run-name="[AUTO] Regression #${JENKINS_BUILD_NUMBER}" \
+            --api-token="$TUSKR_API_TOKEN" \
+            --file="results.xml" \
+            --test-case-rules="rules/tuskr-rules.json" || echo "Tuskr upload failed"
+        fi
       - |
         if [ "$RUN_LIGHTHOUSE" = "true" ]; then
           CHROME=$(find /root/.cache/ms-playwright -name chrome -type f 2>/dev/null | head -1)
@@ -45,8 +56,6 @@ reports:
 
 artifacts:
   files:
-    # results.xml is the JUnit file Jenkins uploads to Tuskr (see Jenkinsfile post{}).
-    - 'results.xml'
     - 'test-results/**/*'
     - 'playwright-report/**/*'
     - 'lighthouse-report/**/*'

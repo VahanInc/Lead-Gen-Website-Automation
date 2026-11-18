@@ -50,7 +50,7 @@ function parseXML(xml) {
 
 function categorise(name) {
   const n = name.toLowerCase();
-  if (/does not|empty phone|empty footer|wrong|not allow|not accept|not navigate|not submit|not proceed|non.numeric|shorter than|area alone|not enable|unregistered/.test(n))
+  if (/does not|empty phone|empty footer|wrong|not allow|not accept|not navigate|not submit|not proceed|non.numeric|shorter than|area alone|not enable|unregistered|rejects|stripped|capped/.test(n))
     return 'negative';
   if (/rapid|zero.result|duplicate|overflow|break|broken|previous from|internal space|strips space|long translated|language switch with/.test(n))
     return 'edge';
@@ -59,9 +59,11 @@ function categorise(name) {
 
 function featureLabel(suiteName) {
   if (suiteName.startsWith('jobs/jobsPageTests'))         return 'Jobs Page – UI Validation';
+  if (suiteName.startsWith('jobs/jobDetailPageTests'))    return 'Job Detail Page';
   if (suiteName.startsWith('jobs/'))                      return 'Jobs Page – Interactions';
   if (suiteName.startsWith('riderHub/riderHubPageTests')) return 'RiderHub – UI Validation';
   if (suiteName.startsWith('riderHub/'))                  return 'RiderHub – Interactions';
+  if (suiteName.startsWith('site/'))                      return 'Site-wide – Smoke, Nav & Mobile';
   return suiteName;
 }
 

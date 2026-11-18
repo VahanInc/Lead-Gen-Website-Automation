@@ -1,7 +1,41 @@
 import { Page, Locator, expect } from '@playwright/test';
+import { WHATSAPP_URL_PATTERN } from '../constants/urls';
+import { SiteFooter, SiteHeader } from './SiteChrome';
+
+export type Language = 'english' | 'hindi' | 'tamil' | 'kannada';
 
 export class BasePage {
-  constructor(protected page: Page) {}
+  readonly header: SiteHeader;
+  readonly footer: SiteFooter;
+
+  constructor(protected page: Page) {
+    this.header = new SiteHeader(page);
+    this.footer = new SiteFooter(page);
+  }
+
+  /**
+   * Captures (and aborts) any request to WhatsApp so the test never leaves vahan.ai.
+   * Context-level so target="_blank" popups and window.open are caught too.
+   * Returns a getter for the last captured URL — poll it after the click.
+   */
+  async interceptWhatsAppNavigation(): Promise<() => string> {
+    let capturedUrl = '';
+    await this.page.context().route(WHATSAPP_URL_PATTERN, async route => {
+      capturedUrl = route.request().url();
+      await route.abort();
+    });
+    return () => capturedUrl;
+  }
+
+  /** Language picker (job-seeker pages only). Choice is persisted in localStorage. */
+  async switchLanguage(to: Language): Promise<void> {
+    await this.header.languageButton.click();
+    await this.header.languageOptions[to].click();
+    await expect(this.page.locator('html')).toHaveAttribute(
+      'lang',
+      { english: 'en', hindi: 'hi', tamil: 'ta', kannada: /ka|kn/ }[to] as string | RegExp,
+    );
+  }
 
   async verifyAndHighlight(name: string, locator: Locator): Promise<void> {
     await expect(locator, `${name} should be visible`).toBeVisible();
@@ -47,25 +81,6 @@ export class BasePage {
       }
       await this._renderElementPanel(results);
     }
-  }
-
-  async switchLanguage(to: 'english' | 'hindi' | 'tamil' | 'kannada'): Promise<void> {
-    const NAMES: Record<string, string> = {
-      english: 'English',
-      hindi: 'हिंदी',
-      tamil: 'தமிழ்',
-      kannada: 'ಕನ್ನಡ',
-    };
-    const banner = this.page.getByRole('banner');
-    const langToggle = banner.locator('button').filter({
-      hasText: /^(ENGLISH|हिंदी|தமிழ்|ಕನ್ನಡ)$/,
-    }).first();
-    await langToggle.evaluate((btn) => (btn as HTMLButtonElement).click());
-    await this.page.waitForTimeout(500);
-    await banner
-      .getByRole('button', { name: NAMES[to], exact: true })
-      .evaluate((btn) => (btn as HTMLButtonElement).click());
-    await this.page.waitForTimeout(1500);
   }
 
   protected async _renderElementPanel(results: { name: string; found: boolean }[]): Promise<void> {

@@ -17,7 +17,8 @@ export default defineConfig({
     timeout: 10_000,
   },
   use: {
-    baseURL: process.env.BASE_URL,
+    // Site moved to vahan.ai (apex 301s to www). Override with BASE_URL for other envs.
+    baseURL: process.env.BASE_URL || 'https://www.vahan.ai',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     // Grant geolocation permission so the browser never shows a native popup.

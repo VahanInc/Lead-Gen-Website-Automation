@@ -1,144 +1,153 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, expect } from '@playwright/test';
 import { ROUTES } from '../constants/urls';
-import { WHATSAPP_URL_PATTERN } from './JobsPage';
 import { BasePage } from './BasePage';
 
+/**
+ * /rider-adda/ ("Rider Hub") on vahan.ai.
+ *
+ * Flow: hero + featured video → category tabs (role=tab) → paginated video grid
+ * (4 per page, client-side) → "Jobs Near You" (3 job cards + Browse All Jobs) →
+ * "Alert Me" form (submits to wa.me) → latest blogs → footer.
+ * No language picker on this page.
+ */
 export class RiderHubPage extends BasePage {
   readonly heroHeading: Locator;
+  readonly heroSubheading: Locator;
+  readonly featuredVideo: Locator;
 
-  readonly filterTabs: Record<string, Locator>;
-  // Each video card is an <a href="/rider-adda/<slug>/"> containing a thumbnail img
+  readonly categoryTablist: Locator;
+  readonly categoryTabs: Record<string, Locator>;
+  readonly selectedTab: Locator;
+  /** Only the cards on the current grid page; hidden cards stay in the DOM. */
   readonly videoCards: Locator;
+  readonly videoPager: Locator;
+  readonly previousPage: Locator;
+  readonly nextPage: Locator;
+  readonly currentVideoPage: Locator;
+
+  readonly jobsNearYouHeading: Locator;
+  readonly jobKnowMoreLinks: Locator;
+  readonly jobApplyLinks: Locator;
+  readonly browseAllJobsLink: Locator;
 
   readonly alertHeading: Locator;
   readonly areaNameInput: Locator;
   readonly alertWhatsAppInput: Locator;
   readonly alertSubmitButton: Locator;
 
-  readonly latestBlogHeading: Locator;
-  // Blog cards: <a href="/blog/<slug>/"> containing a thumbnail img
+  readonly blogRegion: Locator;
   readonly blogCards: Locator;
-  readonly seeMoreBlogsLink: Locator;
-
-  readonly browseAllJobsLink: Locator;
-
-  readonly footerWhatsAppInput: Locator;
-  readonly footerContactButton: Locator;
+  readonly viewAllBlogsLink: Locator;
 
   constructor(page: Page) {
     super(page);
-    const contentinfo = page.getByRole('contentinfo');
 
-    this.heroHeading = page.getByRole('heading', {
-      name: 'Learn, earn, and stay ahead.',
-      level: 1,
-    });
+    this.heroHeading = page.getByRole('heading', { name: 'Learn, earn, and stay ahead.', level: 1 });
+    this.heroSubheading = page.getByText(/Short videos packed with delivery tips/);
+    this.featuredVideo = page.locator('a.rh-feature');
 
-    // The filter buttons display as uppercase (CSS text-transform) but their DOM text is
-    // title-case. They're duplicated in the DOM (mobile + desktop), so use .first().
-    this.filterTabs = {
-      all: page.getByRole('button', { name: 'All', exact: true }).first(),
-      comedy: page.getByRole('button', { name: 'Comedy', exact: true }).first(),
-      education: page.getByRole('button', { name: 'Education', exact: true }).first(),
-      entertainment: page.getByRole('button', { name: 'Entertainment', exact: true }).first(),
-      healthWellness: page.getByRole('button', { name: 'Health & Wellness', exact: true }).first(),
-      investment: page.getByRole('button', { name: 'Investment', exact: true }).first(),
-      series: page.getByRole('button', { name: 'Series', exact: true }).first(),
-      socialAwareness: page.getByRole('button', { name: 'Social Awareness', exact: true }).first(),
-      technology: page.getByRole('button', { name: 'Technology', exact: true }).first(),
-      tipsTricks: page.getByRole('button', { name: 'Tips & Tricks', exact: true }).first(),
+    this.categoryTablist = page.getByRole('tablist', { name: 'Filter videos by category' });
+    const tab = (name: string) => this.categoryTablist.getByRole('tab', { name, exact: true });
+    this.categoryTabs = {
+      all: tab('All'),
+      comedy: tab('Comedy'),
+      education: tab('Education'),
+      entertainment: tab('Entertainment'),
+      healthWellness: tab('Health & Wellness'),
+      investment: tab('Investment'),
+      series: tab('Series'),
+      socialAwareness: tab('Social Awareness'),
+      technology: tab('Technology'),
+      tipsTricks: tab('Tips & Tricks'),
     };
+    this.selectedTab = this.categoryTablist.getByRole('tab', { selected: true });
+    this.videoCards = page.locator('a.vcard:not(.vcard-hidden)');
+    this.videoPager = page.getByRole('navigation', { name: 'Video pages' });
+    this.previousPage = this.videoPager.getByRole('button', { name: 'Previous page' });
+    this.nextPage = this.videoPager.getByRole('button', { name: 'Next page' });
+    this.currentVideoPage = this.videoPager.locator('[aria-current="page"]');
 
-    this.videoCards = page
-      .locator('a[href^="/rider-adda/"]')
-      .filter({ has: page.locator('img') });
+    this.jobsNearYouHeading = page.getByRole('heading', { level: 2, name: 'Jobs Near You' });
+    this.jobKnowMoreLinks = page.getByRole('link', { name: /^Know more:/ });
+    this.jobApplyLinks = page.getByRole('link', { name: /^Apply on WhatsApp:/ });
+    this.browseAllJobsLink = page.getByRole('link', { name: 'Browse All Jobs' });
 
-    this.alertHeading = page.getByRole('heading', {
-      name: 'Alert me for a job in my area',
-      level: 2,
-    });
+    this.alertHeading = page.getByRole('heading', { level: 2, name: /Alert Me for a Job in My Area/i });
     this.areaNameInput = page.getByRole('textbox', { name: 'Area Name' });
-    this.alertWhatsAppInput = page.getByRole('textbox', { name: 'WhatsApp Number' }).first();
-    this.alertSubmitButton = page.getByRole('button', { name: 'SUBMIT', exact: true });
+    this.alertWhatsAppInput = page.getByRole('textbox', { name: /WhatsApp Number/ });
+    this.alertSubmitButton = page.getByRole('button', { name: 'Submit', exact: true });
 
-    // Heading text is title-case in DOM ("Latest from the Blog"), CSS transforms to uppercase.
-    this.latestBlogHeading = page.getByRole('heading', { name: 'Latest from the Blog', level: 2 });
-    this.blogCards = page.locator('a[href^="/blog/"]').filter({ has: page.locator('img') });
-    // Link text is "See More Blogs" in DOM, CSS transforms to uppercase.
-    this.seeMoreBlogsLink = page.getByRole('link', { name: 'See More Blogs', exact: true });
-
-    this.browseAllJobsLink = page.getByRole('link', { name: /Browse All Jobs/i });
-
-    this.footerWhatsAppInput = contentinfo.getByRole('textbox', { name: 'WhatsApp Number' });
-    this.footerContactButton = contentinfo.getByRole('button', { name: 'Contact Me' });
+    this.blogRegion = page.getByRole('region', { name: 'Read our latest blogs' });
+    this.blogCards = this.blogRegion.locator('a[href^="/blog/"]').filter({
+      has: page.getByRole('heading', { level: 3 }),
+    });
+    this.viewAllBlogsLink = this.blogRegion.getByRole('link', { name: 'View all blogs' });
   }
 
   async goto() {
     await this.page.goto(ROUTES.riderHub, { waitUntil: 'domcontentloaded' });
-    await this.heroHeading.waitFor({ state: 'visible', timeout: 15000 });
-    await this.page.waitForFunction(
-      () => !!document.querySelector('button[aria-pressed]'),
-      { timeout: 10000 }
-    );
-    // Brief pause so the test-name banner is readable before interactions start.
-    await this.page.waitForTimeout(1200);
+    await expect(this.heroHeading).toBeVisible({ timeout: 15_000 });
+    await expect(this.videoCards.first()).toBeVisible({ timeout: 15_000 });
+    await this.page.waitForTimeout(800);
   }
 
-  async interceptWhatsAppNavigation(): Promise<() => string> {
-    let capturedUrl = '';
-    await this.page.context().route(WHATSAPP_URL_PATTERN, async route => {
-      capturedUrl = route.request().url();
-      await route.abort();
-    });
-    return () => capturedUrl;
+  async selectCategory(key: keyof RiderHubPage['categoryTabs'] | string) {
+    const t = this.categoryTabs[key as string];
+    await t.click();
+    await expect(t).toHaveAttribute('aria-selected', 'true');
+    await expect(this.videoCards.first()).toBeVisible();
+  }
+
+  async visibleVideoHrefs(): Promise<string[]> {
+    return this.videoCards.evaluateAll(as => as.map(a => a.getAttribute('href') ?? ''));
+  }
+
+  /** Category tags rendered at the end of each card, e.g. "Education, Tips & Tricks". */
+  async visibleVideoTexts(): Promise<string[]> {
+    return this.videoCards.evaluateAll(as => as.map(a => (a.textContent ?? '').replace(/\s+/g, ' ').trim()));
   }
 }
 
-export class VideoDetailPage {
-  // Player shows a thumbnail with this button until clicked; the YouTube iframe
-  // is only mounted afterwards.
+/** /rider-adda/<slug>/ */
+export class VideoDetailPage extends BasePage {
+  readonly main: Locator;
   readonly playButton: Locator;
   readonly youtubeIframe: Locator;
+  readonly categoryTags: Locator;
   readonly videoTitle: Locator;
   readonly viewCount: Locator;
-  readonly applyOnWhatsAppButton: Locator;
-  readonly languageTabs: Record<string, Locator>;
-  // Sidebar cards linking to other video detail pages
+  readonly descriptionRegion: Locator;
+  readonly transcriptTabs: Record<string, Locator>;
+  readonly transcriptPanel: Locator;
+  readonly applyOnWhatsAppLink: Locator;
+  readonly moreVideos: Locator;
   readonly moreVideoCards: Locator;
+  readonly seeAllVideosLink: Locator;
+  readonly browseJobsLink: Locator;
 
-  constructor(private page: Page) {
-    // Scope to <main> to exclude the header language dropdown options, which also
-    // contain "English" / "हिंदी" buttons. Both sets are duplicated (mobile + desktop)
-    // so we also use .first() on each.
-    const main = page.locator('main');
-
-    this.playButton = main.getByRole('button', { name: /^Play video:/ });
+  constructor(page: Page) {
+    super(page);
+    this.main = page.getByRole('main');
+    this.playButton = this.main.getByRole('button', { name: /^Play video:/ });
     this.youtubeIframe = page.locator('iframe[src*="youtube"]');
-    this.videoTitle = main.getByRole('heading', { level: 1 });
-    // Sidebar "More Videos" cards also show view counts in <span> elements;
-    // the main video count is in a <p> — scope to <p> to avoid strict-mode violations.
-    this.viewCount = main.locator('p').filter({ hasText: /\d+[kKmM]? views/i }).first();
-    this.applyOnWhatsAppButton = main.getByRole('link', { name: /Apply on WhatsApp/i });
-    this.languageTabs = {
-      english: main.getByRole('button', { name: 'English', exact: true }).first(),
-      hindi: main.getByRole('button', { name: 'हिंदी', exact: true }).first(),
-      tamil: main.getByRole('button', { name: 'தமிழ்', exact: true }).first(),
-      kannada: main.getByRole('button', { name: 'ಕನ್ನಡ', exact: true }).first(),
-      telugu: main.getByRole('button', { name: 'తెలుగు', exact: true }).first(),
+    this.categoryTags = this.main.getByRole('list').first().getByRole('listitem');
+    this.videoTitle = this.main.getByRole('heading', { level: 1 });
+    this.viewCount = this.main.getByText(/[\d.]+[kKmM]? views/).first();
+    this.descriptionRegion = this.main.getByRole('region', { name: 'Description' });
+    const tablist = this.descriptionRegion.getByRole('tablist', { name: 'Transcript language' });
+    const tab = (name: string) => tablist.getByRole('tab', { name, exact: true });
+    this.transcriptTabs = {
+      english: tab('English'),
+      hindi: tab('हिंदी'),
+      tamil: tab('தமிழ்'),
+      kannada: tab('ಕನ್ನಡ'),
+      telugu: tab('తెలుగు'),
     };
-    // Sidebar cards link to other detail pages. The current page's own slug may also
-    // appear here — the test filters it out by checking for a different href.
-    this.moreVideoCards = main
-      .locator('a[href^="/rider-adda/"]')
-      .filter({ has: page.locator('img') });
-  }
-
-  async interceptWhatsAppNavigation(): Promise<() => string> {
-    let capturedUrl = '';
-    await this.page.context().route(WHATSAPP_URL_PATTERN, async route => {
-      capturedUrl = route.request().url();
-      await route.abort();
-    });
-    return () => capturedUrl;
+    this.transcriptPanel = this.descriptionRegion.getByRole('tabpanel');
+    this.applyOnWhatsAppLink = this.main.getByRole('link', { name: 'Apply on WhatsApp' });
+    this.moreVideos = this.main.getByRole('complementary', { name: 'More videos' });
+    this.moreVideoCards = this.moreVideos.locator('a[href^="/rider-adda/"]:not([href="/rider-adda/"])');
+    this.seeAllVideosLink = this.moreVideos.getByRole('link', { name: 'See all videos' });
+    this.browseJobsLink = this.moreVideos.getByRole('link', { name: 'Browse delivery jobs' });
   }
 }

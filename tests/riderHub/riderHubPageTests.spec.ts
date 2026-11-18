@@ -7,18 +7,45 @@ test.describe('RiderHub page - UI element validation', () => {
     const riderHubPage = new RiderHubPage(page);
     await riderHubPage.goto();
 
-    await test.step('Hero', async () => {
-      await riderHubPage.verifyAndHighlight('heroHeading', riderHubPage.heroHeading);
+    await test.step('Header', async () => {
+      await riderHubPage.verifyAllWithHighlight({
+        logo: riderHubPage.header.logo,
+        solutionsMenu: riderHubPage.header.menus.solutions,
+        companyMenu: riderHubPage.header.menus.company,
+        resourcesMenu: riderHubPage.header.menus.resources,
+        caseStudies: riderHubPage.header.caseStudiesLink,
+        contactUs: riderHubPage.header.contactUsLink,
+      });
     });
 
-    await test.step('Video category filter tabs', async () => {
-      await riderHubPage.verifyAllWithHighlight(riderHubPage.filterTabs);
+    await test.step('Hero + featured video', async () => {
+      await riderHubPage.verifyAllWithHighlight({
+        heroHeading: riderHubPage.heroHeading,
+        heroSubheading: riderHubPage.heroSubheading,
+        featuredVideo: riderHubPage.featuredVideo,
+      });
     });
 
-    await test.step('Video cards', async () => {
-      const count = await riderHubPage.videoCards.count();
-      expect(count).toBeGreaterThan(0);
-      await riderHubPage.verifyAndHighlight('firstVideoCard', riderHubPage.videoCards.first());
+    await test.step('Video category tabs', async () => {
+      await riderHubPage.verifyAllWithHighlight(riderHubPage.categoryTabs);
+      await expect(riderHubPage.selectedTab).toHaveText('All');
+    });
+
+    await test.step('Video grid + pager', async () => {
+      await expect(riderHubPage.videoCards).toHaveCount(4);
+      await riderHubPage.verifyAllWithHighlight({
+        firstVideoCard: riderHubPage.videoCards.first(),
+        videoPager: riderHubPage.videoPager,
+      });
+      await expect(riderHubPage.previousPage).toBeDisabled();
+      await expect(riderHubPage.nextPage).toBeEnabled();
+    });
+
+    await test.step('Jobs Near You', async () => {
+      await riderHubPage.verifyAndHighlight('jobsNearYouHeading', riderHubPage.jobsNearYouHeading);
+      await expect(riderHubPage.jobKnowMoreLinks).toHaveCount(3);
+      await expect(riderHubPage.jobApplyLinks).toHaveCount(3);
+      await riderHubPage.verifyAndHighlight('browseAllJobsLink', riderHubPage.browseAllJobsLink);
     });
 
     await test.step('Alert Me', async () => {
@@ -31,22 +58,14 @@ test.describe('RiderHub page - UI element validation', () => {
     });
 
     await test.step('Blog section', async () => {
-      await riderHubPage.verifyAndHighlight('latestBlogHeading', riderHubPage.latestBlogHeading);
-      const blogCount = await riderHubPage.blogCards.count();
-      expect(blogCount).toBeGreaterThan(0);
+      await riderHubPage.verifyAndHighlight('blogRegion', riderHubPage.blogRegion);
+      await expect(riderHubPage.blogCards).toHaveCount(3);
       await riderHubPage.verifyAndHighlight('firstBlogCard', riderHubPage.blogCards.first());
-      await riderHubPage.verifyAndHighlight('seeMoreBlogsLink', riderHubPage.seeMoreBlogsLink);
-    });
-
-    await test.step('Browse All Jobs CTA', async () => {
-      await riderHubPage.verifyAndHighlight('browseAllJobsLink', riderHubPage.browseAllJobsLink);
+      await riderHubPage.verifyAndHighlight('viewAllBlogsLink', riderHubPage.viewAllBlogsLink);
     });
 
     await test.step('Footer', async () => {
-      await riderHubPage.verifyAllWithHighlight({
-        footerWhatsAppInput: riderHubPage.footerWhatsAppInput,
-        footerContactButton: riderHubPage.footerContactButton,
-      });
+      await riderHubPage.verifyAllWithHighlight(riderHubPage.footer.links);
     });
   });
 });
